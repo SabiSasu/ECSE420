@@ -13,7 +13,7 @@ __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned
 {
 	unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
     //unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
-    unsigned int new_index = index /2;
+	unsigned int new_index = index / 4; //index /2;
 
     if (index < size) {
         //loop through rgba
@@ -56,7 +56,7 @@ int process_pool() {
     // get arguments from command line
     char* input_filename = "Test Images\\Test_1.png"; //argv[1];
     char* output_filename = "Output Images\\Test_1_output_pool.png"; //argv[2];
-    int threadNum = 1000; //atoi(argv[3]);
+	int threadNum = 1000; //atoi(argv[3]);
 
     //getting image and its size
     unsigned error;
@@ -91,7 +91,7 @@ int process_pool() {
     //stop timer
     cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
     cudaEventElapsedTime(&memsettime, start, stop);
-    printf("Rectify: thread count is %d, ran in %f milliseconds\n", threadNum, memsettime);
+    printf("Pool: thread count is %d, ran in %f milliseconds\n", threadNum, memsettime);
     cudaEventDestroy(start); cudaEventDestroy(stop);
 
     //free cuda memory
@@ -125,7 +125,7 @@ int process_pool2() {
 	unsigned int size_image = width * height * 4 * sizeof(unsigned char); // height x width number of pixels, 4 layers (RGBA) for each pixel, 1 char for each value
 
 	// define number of threads
-	unsigned int thread_number = 1000;		// number of threads per block we're using
+	unsigned int thread_number = 256;		// number of threads per block we're using
 	unsigned int thread_max = 1024;			// hardware limit: maximum number of threads per block
 
 	if (thread_number > thread_max) {		// can't have more threads than the hardware limit
@@ -149,11 +149,13 @@ int process_pool2() {
 	}
 
 	// figure out how many blocks we need for this task
-	unsigned int num_blocks = ceil((size_image / thread_number) / 16) + 1;
-	unsigned int blocks_per_row = ceil(width / thread_number);
+	unsigned int num_blocks = 36000 * 4;//144000;//ceil((size_image / thread_number)/*/16*/) /*+ 1*/;
+	unsigned int blocks_per_row =7200; //28800;//ceil(width / thread_number);
+	//unsigned int num_blocks = blocks_per_row * height / 2;
 
 	// call method on GPU
-	compression << < num_blocks, thread_number >> > (cuda_image_pool, cuda_new_image_pool, width, size_image, blocks_per_row);
+	pooling << < num_blocks, thread_number >> > (cuda_image_pool, cuda_new_image_pool, width, size_image, blocks_per_row);
+	//compression << <1, 1 >> > (cuda_image_pool, cuda_new_image_pool, width, size_image, 1);
 	cudaDeviceSynchronize();
 
 	// CPU copies input data from GPU back to CPU
@@ -172,4 +174,4 @@ int process_pool2() {
 	return 0;
 }
 
-int main(int argc, char* argv[]){return process_pool();}
+int main(int argc, char* argv[]){return process_pool2();}

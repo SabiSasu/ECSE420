@@ -9,122 +9,167 @@
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
-__global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned height)
+__global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size, unsigned int blocks_per_row)
 {
-    for (int i = 0; i < height; i+=2) {
-        for (int j = 0; j < width; j+=2) {
+	unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
+    //unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
+    unsigned int new_index = index /2;
 
-          //loop through rgba
-            for (int k = 0; k < 4; k++) {
-                int tl = (int)image[4*width*i + 4*j + k]; //top left
-                int bt = (int)image[4*width*(i) + 4*(j + 1) + k]; //bot left
-                int tr = (int)image[4*width*(i + 1) + 4*j + k]; //top right
-                int br = (int)image[4*width*(i + 1) + 4*(j + 1) + k]; //bot right
+    if (index < size) {
+        //loop through rgba
+        for (int k = 0; k < 4; k++) {
+            int tl = (int)image[index + k]; //top left
+            int tr = (int)image[index + 4 + k]; //top right
+            int bl = (int)image[index + (4*width) + k]; //bot left
+            int br = (int)image[index + (4 * width) + 4 + k]; //bot right
            
-                signed int val = max(max(tl, bt), max(tr, br));
+            signed int val = max(max(tl, bl), max(tr, br));
                 
-                //assign new value to pixel
-                new_image[4*width * (i/2) + 4*(j/2) + k] = (unsigned char)val;
-            }
+            //assign new value to pixel
+            new_image[new_index + k] = (unsigned char)val;
         }
     }
 }
 
 __global__ void compression(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size, unsigned int blocks_per_row) {
-    unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
-    unsigned int new_index = (threadIdx.x + blockIdx.x * blockDim.x) + 4;
+	unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
+	unsigned int new_index = (threadIdx.x + blockIdx.x * blockDim.x) + 4;
 
-    if (index < size) {
-        for (int i = 0; i < 4; i++) {						// iterate through R, G, B, A
-            unsigned int max = image[index];
-            if (image[index + 4 + i] > max) {				// pixel to the right
-                max = image[index + 4 + i];
-            }
-            if (image[index + (4 * width) + i] > max) {		// pixel below
-                max = image[index + (4 * width) + i];
-            }
-            if (image[index + (4 * width) + 4 + i] > max) {	// pixel below & to the right
-                max = image[index + (4 * width) + 4 + i];
-            }
-            new_image[new_index + i] = max;
-        }
-    }
+	if (index < size) {
+		for (int i = 0; i < 4; i++) {						// iterate through R, G, B, A
+			unsigned int max = image[index];
+			if (image[index + 4 + i] > max) {				// pixel to the right
+				max = image[index + 4 + i];
+			}
+			if (image[index + (4 * width) + i] > max) {		// pixel below
+				max = image[index + (4 * width) + i];
+			}
+			if (image[index + (4 * width) + 4 + i] > max) {	// pixel below & to the right
+				max = image[index + (4 * width) + 4 + i];
+			}
+			new_image[new_index + i] = max;
+		}
+	}
 }
 
-/*
-int main(int argc, char* argv[])
-{
-    // allocate memory space on GPU
-    unsigned char* cuda_image_pool, * cuda_new_image_pool;
-    cudaMalloc((void**)& cuda_image_pool, size_image);
-    cudaMalloc((void**)& cuda_new_image_pool, size_image);
-
-    // CPU copies input data from CPU to GPU
-    cudaMemcpy(cuda_image_pool, image, size_image, cudaMemcpyHostToDevice);
-
-    // maximum number of threads we can use is 1 per 16 pixel values
-        // that's because we can use maximum 1 thread per 2x2 area, and each pixel in that 2x2 area has 4 values
-    if (thread_number > ceil(size_image / 16)) {
-        thread_number = ceil(size_image / 16);
-    }
-
-    // figure out how many blocks we need for this task
-    num_blocks = ceil((size_image / thread_number) / 16) + 1;
-    unsigned int blocks_per_row = ceil(width / thread_number);
-
-    // call method on GPU
-    compression <<< num_blocks, thread_number >>> (cuda_image_pool, cuda_new_image_pool, width, size_image, blocks_per_row);
-    cudaDeviceSynchronize();
-
-    // CPU copies input data from GPU back to CPU
-    unsigned char* new_image_pool = (unsigned char*)malloc(size_image);
-    cudaMemcpy(new_image_pool, cuda_new_image_pool, size_image, cudaMemcpyDeviceToHost);
-    cudaFree(cuda_image_pool);
-    cudaFree(cuda_new_image_pool);
-
-    lodepng_encode32_file(filename3, new_image_pool, width / 2, height / 2);
+int process_pool() {
     // get arguments from command line
-    if (argc < 4)
-    {
-        printf("Not enough arguments. Input arguments as follows:\n"
-            "./pool <name of input png> <name of output png> <# threads>\n");
-        return 0;
-    }
+    char* input_filename = "Test Images\\Test_1.png"; //argv[1];
+    char* output_filename = "Output Images\\Test_1_output_pool.png"; //argv[2];
+    int threadNum = 1000; //atoi(argv[3]);
 
-    char* input_filename = argv[1];
-    char* output_filename = argv[2];
-    int threadNum = atoi(argv[3]);
-
-
+    //getting image and its size
     unsigned error;
-    unsigned char* image,  * new_image_poo;
+    unsigned char* image, * new_image_rec;
     unsigned width, height;
-
 
     error = lodepng_decode32_file(&image, &width, &height, input_filename);
     if (error) printf("error %u: %s\n", error, lodepng_error_text(error));
-    
-    unsigned size = width * height;
-    //allocated half the space since image has half the pixels
-    new_image_poo = (unsigned char*)malloc(width/2 * height/2 * 4 * sizeof(unsigned char));
+    unsigned int size = width * height * 4 * sizeof(unsigned char);
+    new_image_rec = (unsigned char*)malloc(size);
 
-    //timer
-    time_t start, end;
-    start = clock();
+    //defining device vars
+    unsigned char* image_cuda, * new_image_rec_cuda;
+    cudaMalloc((void**)&image_cuda, size);
+    cudaMalloc((void**)&new_image_rec_cuda, size);
+    cudaMemcpy(image_cuda, image, size, cudaMemcpyHostToDevice);
 
-    pooling << <size / threadNum, threadNum >> > (image, new_image_poo, width, height);
-    //finish timer
-    end = clock();
-    printf("Thread count is %s, ran in %s seconds\n", threadNum, end);
-    //t = (end - start) / CLOCKS_PER_SEC;
+    //start timer
+    float memsettime;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
 
-    //saves image and frees pointers
-    lodepng_encode32_file(output_filename, new_image_poo, width, height);
+    // figure out how many blocks we need for this task
+    unsigned int num_blocks = ceil((size / threadNum) / 16) + 1;
+    unsigned int blocks_per_row = ceil(width / threadNum);
 
+    // pool
+    compression << < num_blocks, threadNum >> > (image_cuda, new_image_rec_cuda, width, size, blocks_per_row);
+    cudaDeviceSynchronize();
+
+    //stop timer
+    cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&memsettime, start, stop);
+    printf("Rectify: thread count is %d, ran in %f milliseconds\n", threadNum, memsettime);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+
+    //free cuda memory
+    cudaMemcpy(new_image_rec, new_image_rec_cuda, size, cudaMemcpyDeviceToHost);
+    cudaFree(image_cuda);
+    cudaFree(new_image_rec_cuda);
+
+    //save png image
+    lodepng_encode32_file(output_filename, new_image_rec, width / 2, height / 2);
+
+    //free memory
     free(image);
-    free(new_image_poo);
+    free(new_image_rec);
 
-
-    return end;
+    return 0;
 }
-*/
+
+int process_pool2() {
+	// file definitions
+	char* filename1 = "Test Images\\Test_1.png";						// change these depending on what we're doing
+	//char* filename2 = "test_rectify_result.png";		// output for rectify
+	char* filename3 = "Output Images\\Test_1_output_pool.png";		// output for pooling
+	//char* filename4 = "test_rectify_expected_result.png";	// filename for rectify comparison
+	//char* filename5 = "test_pooling_expected_result.png";	// filename for pooling comparison
+
+	// load input image
+	unsigned char* image;
+	unsigned width, height;
+	unsigned error = lodepng_decode32_file(&image, &width, &height, filename1);
+	if (error) printf("error %u: %s\n", error, lodepng_error_text(error));
+	unsigned int size_image = width * height * 4 * sizeof(unsigned char); // height x width number of pixels, 4 layers (RGBA) for each pixel, 1 char for each value
+
+	// define number of threads
+	unsigned int thread_number = 1000;		// number of threads per block we're using
+	unsigned int thread_max = 1024;			// hardware limit: maximum number of threads per block
+
+	if (thread_number > thread_max) {		// can't have more threads than the hardware limit
+		thread_number = thread_max;
+	}
+
+
+	/********** Pooling Start ***********/
+	// allocate memory space on GPU
+	unsigned char* cuda_image_pool, * cuda_new_image_pool;
+	cudaMalloc((void**)&cuda_image_pool, size_image);
+	cudaMalloc((void**)&cuda_new_image_pool, size_image);
+
+	// CPU copies input data from CPU to GPU
+	cudaMemcpy(cuda_image_pool, image, size_image, cudaMemcpyHostToDevice);
+
+	// maximum number of threads we can use is 1 per 16 pixel values
+		// that's because we can use maximum 1 thread per 2x2 area, and each pixel in that 2x2 area has 4 values
+	if (thread_number > ceil(size_image / 16)) {
+		thread_number = ceil(size_image / 16);
+	}
+
+	// figure out how many blocks we need for this task
+	unsigned int num_blocks = ceil((size_image / thread_number) / 16) + 1;
+	unsigned int blocks_per_row = ceil(width / thread_number);
+
+	// call method on GPU
+	compression << < num_blocks, thread_number >> > (cuda_image_pool, cuda_new_image_pool, width, size_image, blocks_per_row);
+	cudaDeviceSynchronize();
+
+	// CPU copies input data from GPU back to CPU
+	unsigned char* new_image_pool = (unsigned char*)malloc(size_image);
+	cudaMemcpy(new_image_pool, cuda_new_image_pool, size_image, cudaMemcpyDeviceToHost);
+	cudaFree(cuda_image_pool);
+	cudaFree(cuda_new_image_pool);
+
+	lodepng_encode32_file(filename3, new_image_pool, width / 2, height / 2);
+	/********** Pooling End ***********/
+
+
+
+	free(image);
+	free(new_image_pool);
+	return 0;
+}
+
+int main(int argc, char* argv[]){return process_pool();}

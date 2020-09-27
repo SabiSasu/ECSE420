@@ -24,20 +24,18 @@ __global__ void rectification(unsigned char* image, unsigned char* new_image, un
 
 }
 
-
-int main(int argc, char* argv[])
-{
+int process() {
 
     // get arguments from command line
     char* input_filename = "Test Images\\Test_1.png"; //argv[1];
     char* output_filename = "Output Images\\Test_1_output.png"; //argv[2];
     int threadNum = 1000; //atoi(argv[3]);
-    
+
     //getting image and its size
     unsigned error;
     unsigned char* image, * new_image_rec;
     unsigned width, height;
-    
+
     error = lodepng_decode32_file(&image, &width, &height, input_filename);
     if (error) printf("error %u: %s\n", error, lodepng_error_text(error));
     unsigned int size = width * height * 4 * sizeof(unsigned char);
@@ -45,8 +43,8 @@ int main(int argc, char* argv[])
 
     //defining device vars
     unsigned char* image_cuda, * new_image_rec_cuda;
-    cudaMalloc((void**) &image_cuda, size);
-    cudaMalloc((void**) &new_image_rec_cuda, size);
+    cudaMalloc((void**)&image_cuda, size);
+    cudaMalloc((void**)&new_image_rec_cuda, size);
     cudaMemcpy(image_cuda, image, size, cudaMemcpyHostToDevice);
 
     //start timer
@@ -58,7 +56,7 @@ int main(int argc, char* argv[])
     //rectify
     rectification << < (size + threadNum - 1) / threadNum, threadNum >> > (image_cuda, new_image_rec_cuda, size);
     cudaDeviceSynchronize();
- 
+
     //stop timer
     cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
     cudaEventElapsedTime(&memsettime, start, stop);
@@ -72,12 +70,14 @@ int main(int argc, char* argv[])
 
     //save png image
     lodepng_encode32_file(output_filename, new_image_rec, width, height);
-    
+
     //free memory
     free(image);
     free(new_image_rec);
 
     return 0;
 }
+
+//int main(int argc, char* argv[]){   return process();}
 
 

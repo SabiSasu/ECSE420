@@ -1,4 +1,5 @@
 
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -13,20 +14,31 @@ __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned
 {
 	unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
     //unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
-	unsigned int new_index = index / 4; //index /2;
-
-    if (index < size) {
+	unsigned int new_index = index; //index /2; //this is the problem. when ur in the same row, new_index = index/2 but when u change rows its index/4
+	//unsigned int index = threadIdx.x + (blockIdx.x % blocks_per_row) * blockDim.x;
+	//unsigned int new_index = (threadIdx.x + blockIdx.x * blockDim.x) + 4;
+	int c = 8;
+	
+	/*if ((((index / (width / 2))) % 2) == 0) {
+		//even
+		c = 8;
+	}
+	else {
+		//odd
+		c = 16;
+	}*/
+	if (index < size / 16) {
         //loop through rgba
         for (int k = 0; k < 4; k++) {
-            int tl = (int)image[index + k]; //top left
-            int tr = (int)image[index + 4 + k]; //top right
-            int bl = (int)image[index + (4*width) + k]; //bot left
-            int br = (int)image[index + (4 * width) + 4 + k]; //bot right
+            int tl = (int)image[index * c + k]; //top left
+            int tr = (int)image[index * c + 4 + k]; //top right
+            int bl = (int)image[index * c + (4*width) + k]; //bot left
+            int br = (int)image[index * c + (4 * width) + 4 + k]; //bot right
            
             signed int val = max(max(tl, bl), max(tr, br));
                 
             //assign new value to pixel
-            new_image[new_index + k] = (unsigned char)val;
+            new_image[new_index * 4 + k] = (unsigned char)val;
         }
     }
 }
@@ -125,7 +137,7 @@ int process_pool2() {
 	unsigned int size_image = width * height * 4 * sizeof(unsigned char); // height x width number of pixels, 4 layers (RGBA) for each pixel, 1 char for each value
 
 	// define number of threads
-	unsigned int thread_number = 256;		// number of threads per block we're using
+	unsigned int thread_number = 128;		// number of threads per block we're using
 	unsigned int thread_max = 1024;			// hardware limit: maximum number of threads per block
 
 	if (thread_number > thread_max) {		// can't have more threads than the hardware limit
@@ -137,20 +149,20 @@ int process_pool2() {
 	// allocate memory space on GPU
 	unsigned char* cuda_image_pool, * cuda_new_image_pool;
 	cudaMalloc((void**)&cuda_image_pool, size_image);
-	cudaMalloc((void**)&cuda_new_image_pool, size_image);
+	cudaMalloc((void**)&cuda_new_image_pool, size_image / 4);
 
 	// CPU copies input data from CPU to GPU
 	cudaMemcpy(cuda_image_pool, image, size_image, cudaMemcpyHostToDevice);
 
 	// maximum number of threads we can use is 1 per 16 pixel values
 		// that's because we can use maximum 1 thread per 2x2 area, and each pixel in that 2x2 area has 4 values
-	if (thread_number > ceil(size_image / 16)) {
-		thread_number = ceil(size_image / 16);
-	}
+	//if (thread_number > ceil(size_image / 16)) {
+		//thread_number = ceil(size_image / 16);
+	//}
 
 	// figure out how many blocks we need for this task
-	unsigned int num_blocks = 36000 * 4;//144000;//ceil((size_image / thread_number)/*/16*/) /*+ 1*/;
-	unsigned int blocks_per_row =7200; //28800;//ceil(width / thread_number);
+	unsigned int num_blocks = width * height / 4 / thread_number;//36000 * 4;//9000;//36000 * 4;//144000;//ceil((size_image / thread_number)/*/16*/) /*+ 1*/;
+	unsigned int blocks_per_row = 15; //7200;//1800; //7200; //28800;//ceil(width / thread_number); //CAN BE REMOVED
 	//unsigned int num_blocks = blocks_per_row * height / 2;
 
 	// call method on GPU
@@ -160,7 +172,7 @@ int process_pool2() {
 
 	// CPU copies input data from GPU back to CPU
 	unsigned char* new_image_pool = (unsigned char*)malloc(size_image);
-	cudaMemcpy(new_image_pool, cuda_new_image_pool, size_image, cudaMemcpyDeviceToHost);
+	cudaMemcpy(new_image_pool, cuda_new_image_pool, size_image / 4, cudaMemcpyDeviceToHost);
 	cudaFree(cuda_image_pool);
 	cudaFree(cuda_new_image_pool);
 

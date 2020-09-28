@@ -21,7 +21,6 @@ __global__ void rectification(unsigned char* image, unsigned char* new_image, un
             new_image[index] = image[index];
         }
     }
-
 }
 
 int process() {
@@ -54,7 +53,7 @@ int process() {
     cudaEventRecord(start, 0);
 
     //rectify
-    rectification << < (size + threadNum - 1) / threadNum, threadNum >> > (image_cuda, new_image_rec_cuda, size);
+    rectification << < size/threadNum, threadNum >> > (image_cuda, new_image_rec_cuda, size);
     cudaDeviceSynchronize();
 
     //stop timer

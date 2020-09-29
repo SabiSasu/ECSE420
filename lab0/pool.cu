@@ -1,5 +1,5 @@
 /*
-* ECSE420 LAB0: Group 15, Sabina Sasu & Erica Depatrillo
+* ECSE420 LAB0: Group 15, Sabina Sasu & Erica De Petrillo
 */
 
 #include "cuda_runtime.h"
@@ -15,11 +15,15 @@
 __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size)
 {
 	unsigned int new_index = threadIdx.x + blockIdx.x * blockDim.x;
-	//multiplied by 8 to 
+	//multiplied by 8 to account for the 2 pixels in width of each 2x2 matrix multiplied by 4 RGBA values
 	unsigned int index = new_index * 8;
 
 	if (index < size) {
-		//
+		//4 * width because of RGBA values
+		//(width / 2) --> the number of 2x2 matrices in 1 row
+		//new_index / (width / 2) --> see which row we're in
+		//to get the correct index of the top left pixel in each 2x2 matrix,
+		//we need to add this constant
 		int c = (4 * width) * (new_index / (width / 2));
 
 		//loop through rgba

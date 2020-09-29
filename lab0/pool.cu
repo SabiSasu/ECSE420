@@ -1,4 +1,6 @@
-
+/*
+* ECSE420 LAB0: Group 15, Sabina Sasu & Erica Depatrillo
+*/
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -13,10 +15,11 @@
 __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size)
 {
 	unsigned int new_index = threadIdx.x + blockIdx.x * blockDim.x;
+	//multiplied by 8 to 
 	unsigned int index = new_index * 8;
 
 	if (index < size) {
-		//do some witchcraft
+		//
 		int c = (4 * width) * (new_index / (width / 2));
 
 		//loop through rgba
@@ -25,7 +28,7 @@ __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned
 			int tr = (int)image[index + c + 4 + k]; //top right
 			int bl = (int)image[index + c + (4 * width) + k]; //bot left
 			int br = (int)image[index + c + (4 * width) + 4 + k]; //bot right
-
+			//get max
 			signed int val = max(max(tl, bl), max(tr, br));
 
 			//assign new value to pixel
@@ -34,11 +37,15 @@ __global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned
 	}
 }
 
-int process_pool() {
+int process_pool(int argc, char* argv[]) {
+
+	if (argc != 4)
+		return 0;
+
 	// get arguments from command line
-	char* input_filename = "Test Images\\Test_1.png"; //argv[1];
-	char* output_filename = "Output Images\\Test_1_output_pool.png"; //argv[2];
-	int threadNum = 1000; //atoi(argv[3]);
+	char* input_filename = argv[1];
+	char* output_filename = argv[2];
+	int threadNum = atoi(argv[3]);
 
 	//getting image and its size
 	unsigned error;
@@ -90,4 +97,4 @@ int process_pool() {
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_pool(); }
+int main(int argc, char* argv[]) { return process_pool(argc, argv); }

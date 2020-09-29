@@ -1,3 +1,6 @@
+/*
+* ECSE420 LAB0: Group 15, Sabina Sasu & Erica Depatrillo
+*/
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -9,26 +12,22 @@
 
 __global__ void rectification(unsigned char* image, unsigned char* new_image, unsigned int size)
 {
-    //change this so it doesnt look too conspicuous
     unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
-
     if (index < size) {
-        
-        if (image[index] < 127) {
-            new_image[index] = 127;
-        }
-        else {
-            new_image[index] = image[index];
-        }
+        //if image[index] has a value lower than 127, then new_image[index] is 127
+        new_image[index] = image[index] < 127 ? 127 : image[index];
     }
 }
 
-int process() {
+int process_rectify(int argc, char* argv[]) {
+
+    if (argc != 4)
+        return 0;
 
     // get arguments from command line
-    char* input_filename = "Test Images\\Test_1.png"; //argv[1];
-    char* output_filename = "Output Images\\Test_1_output.png"; //argv[2];
-    int threadNum = 1000; //atoi(argv[3]);
+    char* input_filename = argv[1];
+    char* output_filename = argv[2];
+    int threadNum = atoi(argv[3]);
 
     //getting image and its size
     unsigned error;
@@ -36,7 +35,8 @@ int process() {
     unsigned width, height;
 
     error = lodepng_decode32_file(&image, &width, &height, input_filename);
-    if (error) printf("error %u: %s\n", error, lodepng_error_text(error));
+    if (error) 
+        printf("error %u: %s\n", error, lodepng_error_text(error));
     unsigned int size = width * height * 4 * sizeof(unsigned char);
     new_image_rec = (unsigned char*)malloc(size);
 
@@ -77,6 +77,6 @@ int process() {
     return 0;
 }
 
-//int main(int argc, char* argv[]){   return process();}
+int main(int argc, char* argv[]){   return process_rectify(argc, argv);}
 
 

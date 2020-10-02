@@ -74,10 +74,10 @@ int process_pool(int argc, char* argv[]) {
 	cudaEventRecord(start, 0);
 
 	// figure out how many blocks we need for this task
-	unsigned int num_blocks = width * height / 4 / threadNum;
+	unsigned int blocks = width * height / 4 / threadNum;
 
 	// pool
-	pooling << < num_blocks, threadNum >> > (image_cuda, new_image_rec_cuda, width, size);
+	pooling << < blocks, threadNum >> > (image_cuda, new_image_rec_cuda, width, size);
 	cudaDeviceSynchronize();
 
 	//stop timer

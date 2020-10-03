@@ -10,9 +10,9 @@
 #include <stdlib.h>
 #include <time.h>
 
-__global__ void rectification(unsigned char* image, unsigned char* new_image, unsigned int size, unsigned int num_thread)
+__global__ void rectification(unsigned char* image, unsigned char* new_image, unsigned int size, unsigned int threadNum)
 {
-    for (int i = threadIdx.x; i < size; i += num_thread) {
+    for (int i = threadIdx.x; i < size; i += threadNum) {
         //if image[index] has a value lower than 127, then new_image[index] is 127
         new_image[i] = image[i] < 127 ? 127 : image[i];
     }
@@ -76,6 +76,6 @@ int process_rectify(int argc, char* argv[]) {
     return 0;
 }
 
-int main(int argc, char* argv[]){   return process_rectify(argc, argv);}
+//int main(int argc, char* argv[]){   return process_rectify(argc, argv);}
 
 

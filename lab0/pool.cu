@@ -12,32 +12,32 @@
 
 #define max(a,b) ((a) > (b) ? (a) : (b))
 
-__global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size)
+__global__ void pooling(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int size, unsigned int threadNum)
 {
-	unsigned int new_index = threadIdx.x + blockIdx.x * blockDim.x;
+	//unsigned int new_index = threadIdx.x + blockIdx.x * blockDim.x;
 	//multiplied by 8 to account for the 2 pixels in width of each 2x2 matrix multiplied by 4 RGBA values
-	unsigned int index = new_index * 8;
+	//unsigned int index = new_index * 8;
 
-	if (index < size) {
+	for (int i = threadIdx.x; i < size/4; i += threadNum) {
 		//4 * width because of RGBA values
 		//(width / 2) --> the number of 2x2 matrices in 1 row
 		//new_index / (width / 2) --> see which row we're in
 		//to get the correct index of the top left pixel in each 2x2 matrix,
 		//we need to add this constant
-		int c = (4 * width) * (new_index / (width / 2));
-
+		//int c = index * 8 + (4 * width) * (index / (width / 2));
+		unsigned int offset = (width * 4 * (i / (width * 2))) + (4 * (i / 4));
 		//loop through rgba
-		for (int k = 0; k < 4; k++) {
-			int tl = (int)image[index + c + k]; //top left
-			int tr = (int)image[index + c + 4 + k]; //top right
-			int bl = (int)image[index + c + (4 * width) + k]; //bot left
-			int br = (int)image[index + c + (4 * width) + 4 + k]; //bot right
+		//for (int k = 0; k < 4; k++) {
+			int tl = (int)image[i + offset]; //top left
+			int tr = (int)image[i + offset + 4]; //top right
+			int bl = (int)image[i + offset + (4*width)]; //bot left
+			int br = (int)image[i + offset + (4 * width) + 4]; //bot right
 			//get max
 			signed int val = max(max(tl, bl), max(tr, br));
 
 			//assign new value to pixel
-			new_image[new_index * 4 + k] = (unsigned char)val;
-		}
+			new_image[i] = (unsigned char)val;
+		//}
 	}
 }
 
@@ -49,7 +49,7 @@ int process_pool(int argc, char* argv[]) {
 	// get arguments from command line
 	char* input_filename = argv[1];
 	char* output_filename = argv[2];
-	int threadNum = atoi(argv[3]);
+	int threadNum = 256;//atoi(argv[3]);
 
 	//getting image and its size
 	unsigned error;
@@ -77,7 +77,7 @@ int process_pool(int argc, char* argv[]) {
 	unsigned int blocks = width * height / 4 / threadNum;
 
 	// pool
-	pooling << < blocks, threadNum >> > (image_cuda, new_image_rec_cuda, width, size);
+	pooling << < 1, threadNum >> > (image_cuda, new_image_rec_cuda, width, size, threadNum);
 	cudaDeviceSynchronize();
 
 	//stop timer
@@ -101,4 +101,4 @@ int process_pool(int argc, char* argv[]) {
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_pool(argc, argv); }
+int main(int argc, char* argv[]) { return process_pool(argc, argv); }

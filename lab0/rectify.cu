@@ -10,12 +10,11 @@
 #include <stdlib.h>
 #include <time.h>
 
-__global__ void rectification(unsigned char* image, unsigned char* new_image, unsigned int size)
+__global__ void rectification(unsigned char* image, unsigned char* new_image, unsigned int size, unsigned int num_thread)
 {
-    unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
-    if (index < size) {
+    for (int i = threadIdx.x; i < size; i += num_thread) {
         //if image[index] has a value lower than 127, then new_image[index] is 127
-        new_image[index] = image[index] < 127 ? 127 : image[index];
+        new_image[i] = image[i] < 127 ? 127 : image[i];
     }
 }
 
@@ -53,7 +52,7 @@ int process_rectify(int argc, char* argv[]) {
     cudaEventRecord(start, 0);
 
     //rectify
-    rectification << < size/threadNum, threadNum >> > (image_cuda, new_image_rec_cuda, size);
+    rectification << < 1, threadNum >> > (image_cuda, new_image_rec_cuda, size, threadNum);
     cudaDeviceSynchronize();
 
     //stop timer

@@ -101,4 +101,4 @@ int process_pool(int argc, char* argv[]) {
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_pool(argc, argv); }
+//int main(int argc, char* argv[]) { return process_pool(argc, argv); }

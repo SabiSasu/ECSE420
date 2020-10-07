@@ -76,6 +76,6 @@ int process_rectify(int argc, char* argv[]) {
     return 0;
 }
 
-//int main(int argc, char* argv[]){   return process_rectify(argc, argv);}
+int main(int argc, char* argv[]){   return process_rectify(argc, argv);}
 
 

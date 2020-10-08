@@ -5,7 +5,6 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#include "lodepng.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -54,12 +53,12 @@ int process_sequential(int argc, char* argv[]) {
 		char gateNum = line[4];
 		int* output = 0;
 		switch (gateNum) {
-			case AND: break;
-			case OR: break;
-			case NAND: break;
-			case NOR: break;
-			case XOR: break;
-			case XNOR: break;
+			case AND: gateA & gateB;  break;
+			case OR: gateA | gateB; break;
+			case NAND: !(gateA & gateB); break;
+			case NOR: !(gateA | gateB); break;
+			case XOR: ((!gateA & gateB) | (gateA & !gateB)); break;
+			case XNOR: !((!gateA & gateB) | (gateA & !gateB)); break;
 		}
 
 		fwrite(output, sizeof(int), 1, output_file);

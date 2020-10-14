@@ -19,13 +19,13 @@
 
 int process_sequential(int argc, char* argv[]) {
 
-	if (argc != 4)
-		return 0;
+	//if (argc != 4)
+	//	return 0;
 
 	// get arguments from command line
-	char* input_filename = argv[1];
-	int file_length = atoi(argv[2]);
-	char* output_filename = "output_file";//argv[3];
+	char* input_filename = "test_data\\input_10000.txt";//argv[1];
+	int file_length = 10000;//atoi(argv[2]);
+	char* output_filename = "output_data\\output_10000.txt";//argv[3];
 	
 	FILE* input_file;
 	FILE* output_file;
@@ -42,30 +42,28 @@ int process_sequential(int argc, char* argv[]) {
 		exit(1);
 	}
 
-
-
 	char line[256];
 	int i = 0;
-	while (i < file_length) {
+	int nums[3] = { 0 };
+	for (int i = 0; i < file_length;  i++) {
 		fgets(line, sizeof(line), input_file);
-		char gateA = line[0];
-		char gateB = line[2];
-		char gateNum = line[4];
-		int* output = 0;
+		int gateA = atoi(&line[0]);
+		int gateB = atoi(&line[2]);
+		int gateNum = atoi(&line[4]);
+		//printf("%d, %d, %d\n", gateA, gateB, gateNum);
+		int output = 0;
 		switch (gateNum) {
-			case AND: gateA & gateB;  break;
-			case OR: gateA | gateB; break;
-			case NAND: !(gateA & gateB); break;
-			case NOR: !(gateA | gateB); break;
-			case XOR: ((!gateA & gateB) | (gateA & !gateB)); break;
-			case XNOR: !((!gateA & gateB) | (gateA & !gateB)); break;
+			case AND: output = gateA & gateB;  break;
+			case OR: output = gateA | gateB; break;
+			case NAND: output = !(gateA & gateB); break;
+			case NOR: output = !(gateA | gateB); break;
+			case XOR: output = ((!gateA & gateB) | (gateA & !gateB)); break;
+			case XNOR: output = !((!gateA & gateB) | (gateA & !gateB)); break;
 		}
-
-		fwrite(output, sizeof(int), 1, output_file);
-		//fputs(output, output_file);
+		//printf("%d\n", output);
+		fprintf(output_file, "%d\n", output);
 	}
 
-	
 	fclose(input_file);
 	fclose(output_file);
 

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <Math.h>
 
 #define AND 0
 #define OR 1
@@ -66,13 +67,16 @@ int process_unified(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	int threadNum = file_length;
-	int blockNum = 1;
-	if (file_length > 1024) {
-		threadNum = 1024;
-		blockNum = file_length / 1024;
-		printf("%d\n", threadNum);
-		printf("%d\n", blockNum);
+	int num_blocks = 0;
+	int num_threads_per_block = 0;
+
+	if (file_length <= 1024) {
+		num_blocks = 1;
+		num_threads_per_block = file_length
+	}
+	else {
+		num_blocks = ((file_length - 1) / 1024) + 1; //1024 is the max number of threads in 1 block
+		num_threads_per_block = ceil(file_length / num_blocks);
 	}
 
 	char* data;

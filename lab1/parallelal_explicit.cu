@@ -17,10 +17,10 @@
 #define XOR 4
 #define XNOR 5
 
-__global__ void logic_gate(char* data, int file_length, char* outputData, int threadNum)
+__global__ void logic_gate_explicit(char* data, int file_length, char* outputData, int threadNum)
 {
 
-	for (int i = threadIdx.x + blockIdx.x; i < file_length; i += threadNum) {
+	for (int i = threadIdx.x + (blockIdx.x * blockDim.x); i < file_length; i += threadNum) {
 		//printf("index: %d\n", i);
 		int gateA = data[i * 6] - '0';
 		int gateB = data[i * 6 + 2] - '0';
@@ -42,7 +42,7 @@ __global__ void logic_gate(char* data, int file_length, char* outputData, int th
 }
 
 
-int process_unified(int argc, char* argv[]) {
+int process_explicit(int argc, char* argv[]) {
 
 	//if (argc != 4)
 	//	return 0;
@@ -98,9 +98,7 @@ int process_unified(int argc, char* argv[]) {
 	cudaEventRecord(start, 0);
 
 	// run
-	logic_gate << < num_blocks, num_threads_per_block >> > (data, file_length, output, num_threads_per_block);
-	cudaMemcpy(output, d_output, file_length * 2, cudaMemcpyDeviceToHost);
-
+	logic_gate_explicit << < num_blocks, num_threads_per_block >> > (d_data, file_length, d_output, num_threads_per_block);
 
 	//stop timer
 	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
@@ -110,16 +108,18 @@ int process_unified(int argc, char* argv[]) {
 
 	//free cuda memory
 	//printf("output:\n %s\n", output);
+	cudaMemcpy(output, d_output, file_length * 2, cudaMemcpyDeviceToHost);
+	cudaFree(d_data);
+	cudaFree(d_output);
 
 	fwrite(output, 1, file_length * 2, output_file);
 
 	fclose(input_file);
 	fclose(output_file);
-	cudaFree(d_data);
-	cudaFree(d_output);
 	free(data);
 	free(output);
+
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_unified(argc, argv); }
+int main(int argc, char* argv[]) { return process_explicit(argc, argv); }

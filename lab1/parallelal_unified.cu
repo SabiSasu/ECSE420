@@ -17,7 +17,7 @@
 #define XOR 4
 #define XNOR 5
 
-__global__ void logic_gate(char* data, int file_length, char* outputData, int threadNum)
+__global__ void logic_gate_unified(char* data, int file_length, char* outputData, int threadNum)
 {
 
 	for (int i = threadIdx.x + blockIdx.x; i < file_length; i += threadNum) {
@@ -48,9 +48,9 @@ int process_unified(int argc, char* argv[]) {
 	//	return 0;
 
 	// get arguments from command line
-	char* input_filename = "test_data\\input_100000.txt";//argv[1];
-	int file_length = 100000;//atoi(argv[2]);
-	char* output_filename = "output_data\\output_100000.txt";//argv[3];
+	char* input_filename = "test_data\\input_10000.txt";//argv[1];
+	int file_length = 10000;//atoi(argv[2]);
+	char* output_filename = "output_data\\output_10000.txt";//argv[3];
 
 	FILE* input_file;
 	FILE* output_file;
@@ -92,7 +92,7 @@ int process_unified(int argc, char* argv[]) {
 	cudaEventRecord(start, 0);
 
 	// run
-	logic_gate << < num_blocks, num_threads_per_block >> > (data, file_length, output, num_threads_per_block);
+	logic_gate_unified << < num_blocks, num_threads_per_block >> > (data, file_length, output, num_threads_per_block);
 	cudaDeviceSynchronize();
 
 	//stop timer
@@ -113,4 +113,4 @@ int process_unified(int argc, char* argv[]) {
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_unified(argc, argv); }
+//int main(int argc, char* argv[]) { return process_unified(argc, argv); }

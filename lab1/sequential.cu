@@ -84,4 +84,4 @@ int process_sequential(int argc, char* argv[]) {
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_sequential(argc, argv); }
+int main(int argc, char* argv[]) { return process_sequential(argc, argv); }

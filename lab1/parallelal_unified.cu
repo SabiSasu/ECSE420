@@ -44,13 +44,13 @@ __global__ void logic_gate_unified(char* data, int file_length, char* outputData
 
 int process_unified(int argc, char* argv[]) {
 
-	//if (argc != 4)
-	//	return 0;
+	if (argc != 4)
+		return 0;
 
 	// get arguments from command line
-	char* input_filename = "test_data\\input_10000.txt";//argv[1];
-	int file_length = 10000;//atoi(argv[2]);
-	char* output_filename = "output_data\\output_10000.txt";//argv[3];
+	char* input_filename = argv[1];
+	int file_length = atoi(argv[2]);
+	char* output_filename = argv[3];
 
 	FILE* input_file;
 	FILE* output_file;
@@ -67,14 +67,10 @@ int process_unified(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	int num_blocks = 0;
-	int num_threads_per_block = 0;
+	int num_blocks = 1;
+	int num_threads_per_block = file_length;
 
-	if (file_length <= 1024) {
-		num_blocks = 1;
-		num_threads_per_block = file_length;
-	}
-	else {
+	if (file_length > 1024) {
 		num_blocks = ((file_length - 1) / 1024) + 1; //1024 is the max number of threads in 1 block
 		num_threads_per_block = ceil(file_length / num_blocks);
 	}
@@ -98,7 +94,7 @@ int process_unified(int argc, char* argv[]) {
 	//stop timer
 	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&memsettime, start, stop);
-	printf("Parallel Unified: thread count is %d, ran in %f milliseconds\n", num_threads_per_block, memsettime);
+	printf("Parallel Unified: file_length is %d, ran in %f milliseconds\n", file_length, memsettime);
 	cudaEventDestroy(start); cudaEventDestroy(stop);
 
 	//free cuda memory
@@ -113,4 +109,4 @@ int process_unified(int argc, char* argv[]) {
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_unified(argc, argv); }
+int main(int argc, char* argv[]) { return process_unified(argc, argv); }

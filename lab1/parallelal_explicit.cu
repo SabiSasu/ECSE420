@@ -44,13 +44,13 @@ __global__ void logic_gate_explicit(char* data, int file_length, char* outputDat
 
 int process_explicit(int argc, char* argv[]) {
 
-	//if (argc != 4)
-	//	return 0;
+	if (argc != 4)
+		return 0;
 
 	// get arguments from command line
-	char* input_filename = "test_data\\input_100000.txt";//argv[1];
-	int file_length = 100000;//atoi(argv[2]);
-	char* output_filename = "output_data\\output_100000.txt";//argv[3];
+	char* input_filename = argv[1];
+	int file_length = atoi(argv[2]);
+	char* output_filename = argv[3];
 
 	FILE* input_file;
 	FILE* output_file;
@@ -67,17 +67,19 @@ int process_explicit(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	int num_blocks = 0;
-	int num_threads_per_block = 0;
+	int num_blocks = 1;
+	int num_threads_per_block = file_length;
 
-	if (file_length <= 1024) {
-		num_blocks = 1;
-		num_threads_per_block = file_length;
-	}
-	else {
+	if (file_length > 1024) {
 		num_blocks = ((file_length - 1) / 1024) + 1; //1024 is the max number of threads in 1 block
 		num_threads_per_block = ceil(file_length / num_blocks);
 	}
+
+	//create timer for data migration
+	float memsettime2;
+	cudaEvent_t start2, stop2;
+	cudaEventCreate(&start2); cudaEventCreate(&stop2);
+	cudaEventRecord(start2, 0);
 
 	char* data;
 	char* output;
@@ -90,8 +92,13 @@ int process_explicit(int argc, char* argv[]) {
 	fread(data, 1, file_length * 6, input_file);
 	cudaMemcpy(d_data, data, file_length * 6, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_output, output, file_length * 2, cudaMemcpyHostToDevice);
-	//printf("%s\n", data);
-	//start timer
+
+	cudaEventRecord(stop2, 0); cudaEventSynchronize(stop2);
+	cudaEventElapsedTime(&memsettime2, start2, stop2);
+	printf("Parallel Explicit data migration: file_length is %d, ran in %f milliseconds\n", file_length, memsettime2);
+	cudaEventDestroy(start2); cudaEventDestroy(stop2);
+	
+	//start timer for execution runtime 
 	float memsettime;
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -103,15 +110,15 @@ int process_explicit(int argc, char* argv[]) {
 	//stop timer
 	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&memsettime, start, stop);
-	printf("Parallel Explicit: thread count is %d, ran in %f milliseconds\n", num_threads_per_block, memsettime);
+	printf("Parallel Explicit: file_length is %d, ran in %f milliseconds\n", file_length, memsettime);
 	cudaEventDestroy(start); cudaEventDestroy(stop);
 
 	//free cuda memory
-	//printf("output:\n %s\n", output);
 	cudaMemcpy(output, d_output, file_length * 2, cudaMemcpyDeviceToHost);
 	cudaFree(d_data);
 	cudaFree(d_output);
 
+	//write output to file
 	fwrite(output, 1, file_length * 2, output_file);
 
 	fclose(input_file);

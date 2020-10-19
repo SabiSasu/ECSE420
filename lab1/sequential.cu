@@ -42,10 +42,8 @@ int process_sequential(int argc, char* argv[]) {
 	int i = 0;
 	int nums[3] = { 0 };
 
-	struct timespec start, stop;
 	//start clock
 	clock_t begin = clock();
-
 	
 	for (int i = 0; i < file_length; i++) {
 		fgets(line, sizeof(line), input_file);
@@ -64,10 +62,11 @@ int process_sequential(int argc, char* argv[]) {
 		}
 		fprintf(output_file, "%d\n", output);
 	}
-	//C timer library clock... doesnt work
+	
 	clock_t end = clock();
-	long time_spent = ((double)end - begin) / CLOCKS_PER_SEC * 10000;
-	printf("Execution time: %f\n",  time_spent);
+
+	float time_spent = ((double)end - begin) / CLOCKS_PER_SEC * 1000;
+	printf("Execution time: %f milliseconds\n",  time_spent);
 
 	fclose(input_file);
 	fclose(output_file);

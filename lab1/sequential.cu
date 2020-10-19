@@ -1,9 +1,7 @@
 /*
-* ECSE420 LAB0: Group 15, Sabina Sasu & Erica De Petrillo
+* ECSE420 LAB1: Group 15, Sabina Sasu & Erica De Petrillo
 */
 
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,13 +42,11 @@ int process_sequential(int argc, char* argv[]) {
 	int i = 0;
 	int nums[3] = { 0 };
 
-	float memsettime;
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start); cudaEventCreate(&stop);
-	cudaEventRecord(start, 0);
+	struct timespec start, stop;
 	//start clock
 	clock_t begin = clock();
 
+	
 	for (int i = 0; i < file_length; i++) {
 		fgets(line, sizeof(line), input_file);
 		int gateA = atoi(&line[0]);
@@ -72,11 +68,6 @@ int process_sequential(int argc, char* argv[]) {
 	clock_t end = clock();
 	long time_spent = ((double)end - begin) / CLOCKS_PER_SEC * 10000;
 	printf("Execution time: %f\n",  time_spent);
-	//cuda clock timer.... sorta works
-	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
-	cudaEventElapsedTime(&memsettime, start, stop);
-	printf("Cuda timer execution time %f milliseconds\n", memsettime);
-	cudaEventDestroy(start); cudaEventDestroy(stop);
 
 	fclose(input_file);
 	fclose(output_file);

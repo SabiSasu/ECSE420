@@ -1,5 +1,5 @@
 /*
-* ECSE420 LAB0: Group 15, Sabina Sasu & Erica De Petrillo
+* ECSE420 LAB1: Group 15, Sabina Sasu & Erica De Petrillo
 */
 
 #include "cuda_runtime.h"

@@ -1,5 +1,5 @@
 /*
-* ECSE420 LAB0: Group 15, Sabina Sasu & Erica De Petrillo
+* ECSE420 LAB1: Group 15, Sabina Sasu & Erica De Petrillo
 */
 
 #include "cuda_runtime.h"
@@ -96,9 +96,6 @@ int process_unified(int argc, char* argv[]) {
 	cudaEventElapsedTime(&memsettime, start, stop);
 	printf("Parallel Unified: file_length is %d, ran in %f milliseconds\n", file_length, memsettime);
 	cudaEventDestroy(start); cudaEventDestroy(stop);
-
-	//free cuda memory
-	//printf("output:\n %s\n", output);
 
 	fwrite(output, 1, file_length * 2, output_file);
 

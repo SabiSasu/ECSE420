@@ -1,3 +1,6 @@
+/*
+* ECSE420 LAB2: Group 15, Sabina Sasu & Erica De Petrillo
+*/
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -56,13 +59,13 @@ __global__ void convolution(unsigned char* image, unsigned char* new_image, unsi
 
 int process_convolve(int argc, char* argv[])
 {
-	//if (argc != 4)
-	//	return 0;
+	if (argc != 4)
+		return 0;
 	
 	// get arguments from command line
-	char* input_filename = "Test_Images//Test_3.png";//argv[1];
-	char* output_filename = "Output_Images//Test_3_convolve.png";//argv[2];
-	int threadNum = 1024;//atoi(argv[3]);
+	char* input_filename = argv[1];
+	char* output_filename = argv[2];
+	int threadNum = atoi(argv[3]);
 
     if (threadNum < 0 || threadNum > 1024)
         return 0;

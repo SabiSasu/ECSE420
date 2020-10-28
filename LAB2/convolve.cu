@@ -60,8 +60,8 @@ int process_convolve(int argc, char* argv[])
 	//	return 0;
 	
 	// get arguments from command line
-	char* input_filename = "Test_Images//Test_1.png";//argv[1];
-	char* output_filename = "Output_Images//Test_1_convolve.png";//argv[2];
+	char* input_filename = "Test_Images//Test_3.png";//argv[1];
+	char* output_filename = "Output_Images//Test_3_convolve.png";//argv[2];
 	int threadNum = 1024;//atoi(argv[3]);
 
     if (threadNum < 0 || threadNum > 1024)

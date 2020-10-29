@@ -33,6 +33,7 @@
 *.lib
 *.pdb
 *.tlog
+*.deps
 *.obj
 lab1/x64/Debug/kernel.cu85451931.deps
 *.idb

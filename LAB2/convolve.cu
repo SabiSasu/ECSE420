@@ -1,121 +1,122 @@
+/*
+* ECSE420 LAB2: Group 15, Sabina Sasu & Erica De Petrillo
+*/
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include "wm.h"
+#include "lodepng.h"
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
+#define weight_matrix wm.w //Default matrix size NxN
 
-__global__ void addKernel(int *c, const int *a, const int *b)
+__global__ void convolution(unsigned char* image, unsigned char* new_image, unsigned width, unsigned int newSize, unsigned int threadNum)
 {
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
+	float w[3][3] =
+	{
+	  1,	2,		-1,
+	  2,	0.25,	-2,
+	  1,	-2,		-1
+	};
+
+	
+	for (int i = threadIdx.x; i < newSize; i += threadNum) {
+
+		//to get the correct index of the top left pixel, need to offset
+		//to make sure that we don't go all the way to the last 2 pixels on each row (8 indices)
+		unsigned int offset = (2 * 4 * ((i/4) / ((width-2))));
+		double value = 0.0;
+		
+		//skip alpha value, which is a modulo of 4
+		if (i == 0 || (i + offset + 1) % 4 != 0) {
+			//top row
+			value += ((int)(image[i + offset]) * w[0][0]);
+			value += ((int)(image[i + offset + 4]) * w[0][1]);
+			value += ((int)(image[i + offset + 8]) * w[0][2]);
+			//middle row
+			value += ((int)(image[i + offset + (4 * width)]) * w[1][0]);
+			value += ((int)(image[i + offset + (4 * width) + 4]) * w[1][1]);
+			value += ((int)(image[i + offset + (4 * width) + 8]) * w[1][2]);
+			//bottom row
+			value += ((int)(image[i + offset + (8 * width)]) * w[2][0]);
+			value += ((int)(image[i + offset + (8 * width) + 4]) * w[2][1]);
+			value += ((int)(image[i + offset + (8 * width) + 8]) * w[2][2]);
+
+			if (value < 0)
+				value = 0;
+			if (value > 255)
+				value = 255;
+		}
+		else
+			value = (int)image[i + offset];
+		//assign new value to pixel
+		new_image[i] = (unsigned int)round(value);
+	}
+
 }
 
-int main()
+int process_convolve(int argc, char* argv[])
 {
-    const int arraySize = 5;
-    const int a[arraySize] = { 1, 2, 3, 4, 5 };
-    const int b[arraySize] = { 10, 20, 30, 40, 50 };
-    int c[arraySize] = { 0 };
+	if (argc != 4)
+		return 0;
+	
+	// get arguments from command line
+	char* input_filename = argv[1];
+	char* output_filename = argv[2];
+	int threadNum = atoi(argv[3]);
 
-    // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addWithCuda failed!");
-        return 1;
-    }
+    if (threadNum < 0 || threadNum > 1024)
+        return 0;
 
-    printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        c[0], c[1], c[2], c[3], c[4]);
+	//getting image and its size
+	unsigned error;
+	unsigned char* image, * new_image_rec;
+	unsigned width, height;
 
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+	error = lodepng_decode32_file(&image, &width, &height, input_filename);
+	if (error) printf("error %u: %s\n", error, lodepng_error_text(error));
+	unsigned int size = width * height * 4 * sizeof(unsigned char);
+	unsigned int newSize = (width - 2) * (height - 2) * 4 * sizeof(unsigned char);
+	new_image_rec = (unsigned char*)malloc(newSize);
+	
 
-    return 0;
+
+	//defining device vars
+	unsigned char* image_cuda, * new_image_rec_cuda;
+	cudaMalloc((void**)&image_cuda, size);
+	cudaMalloc((void**)&new_image_rec_cuda, newSize);
+	cudaMemcpy(image_cuda, image, size, cudaMemcpyHostToDevice);
+
+	//start timer
+	float memsettime;
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start); cudaEventCreate(&stop);
+	cudaEventRecord(start, 0);
+
+    //rectify
+    convolution << < 1, threadNum >> > (image_cuda, new_image_rec_cuda, width, newSize, threadNum);
+	cudaDeviceSynchronize();
+
+	//stop timer
+	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&memsettime, start, stop);
+	printf("\nPool: thread count is %d, ran in %f milliseconds\n", threadNum, memsettime);
+	cudaEventDestroy(start); cudaEventDestroy(stop);
+
+	//free cuda memory
+	cudaMemcpy(new_image_rec, new_image_rec_cuda, newSize, cudaMemcpyDeviceToHost);
+	cudaFree(image_cuda);
+	cudaFree(new_image_rec_cuda);
+
+	//save png image
+	lodepng_encode32_file(output_filename, new_image_rec, width-2, height-2);
+	//free memory
+	free(image);
+	free(new_image_rec);
+
+	return 0;
 }
 
-// Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size)
-{
-    int *dev_a = 0;
-    int *dev_b = 0;
-    int *dev_c = 0;
-    cudaError_t cudaStatus;
-
-    // Choose which GPU to run on, change this on a multi-GPU system.
-    cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
-
-    // Allocate GPU buffers for three vectors (two input, one output)    .
-    cudaStatus = cudaMalloc((void**)&dev_c, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_a, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_b, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    // Launch a kernel on the GPU with one thread for each element.
-    addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-    
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-Error:
-    cudaFree(dev_c);
-    cudaFree(dev_a);
-    cudaFree(dev_b);
-    
-    return cudaStatus;
-}
+int main(int argc, char* argv[]) { return process_convolve(argc, argv); }

@@ -70,7 +70,7 @@ int process_synthesis_512(int argc, char* argv[]) {
 
 	// get arguments from command line
 	int num_of_iterations = atoi(argv[1]);
-	int mode = 1; //change as needded. can be 1, 2, or 3
+	int mode = 1; //change as needded. can be 1, 2, 3, 4 or 5
 	int n = 512; //array is n x n
 
 	float* u2; //previous previous array
@@ -116,10 +116,20 @@ int process_synthesis_512(int argc, char* argv[]) {
 		num_of_blocks = 512;
 		num_of_elems_per_thread = 1;
 	}
-	else { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+	else if (mode == 3) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
 		num_of_threads = 1024;
 		num_of_blocks = 64;
 		num_of_elems_per_thread = 4;
+	}
+	else if (mode == 4) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+		num_of_threads = 512;
+		num_of_blocks = 4;
+		num_of_elems_per_thread = 128;
+	}
+	else if (mode == 5) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+		num_of_threads = 1024;
+		num_of_blocks = 256;
+		num_of_elems_per_thread = 1;
 	}
 
 	//start timer
@@ -169,4 +179,4 @@ int process_synthesis_512(int argc, char* argv[]) {
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_synthesis_512(argc, argv); }
+int main(int argc, char* argv[]) { return process_synthesis_512(argc, argv); }

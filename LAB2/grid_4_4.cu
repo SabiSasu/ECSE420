@@ -88,18 +88,20 @@ int process_synthesis(int argc, char* argv[]) {
 	float eta = 0.0002;
 	float g = 0.75; //boundary gain
 
+	//number of threads
+	int num_of_threads = n * n;
+	unsigned int arraySize = (n * n) * sizeof(float);
+
 	//defining device vars
 	float* u2_cuda;
 	float* u1_cuda;
 	float* u_cuda;
 
-	cudaMalloc((void**)&u2_cuda, sizeof(u2));
-	cudaMalloc((void**)&u1_cuda, sizeof(u1));
-	cudaMalloc((void**)&u_cuda, sizeof(u));
+	cudaMalloc((void**)&u2_cuda, arraySize);
+	cudaMalloc((void**)&u1_cuda, arraySize);
+	cudaMalloc((void**)&u_cuda, arraySize);
 
-	//number of threads
-	int num_of_threads = n * n;
-
+	
 	//start timer
 	float memsettime;
 	cudaEvent_t start, stop;
@@ -109,15 +111,15 @@ int process_synthesis(int argc, char* argv[]) {
 	// synthesis
 	for (int t = 0; t < num_of_iterations; t++) {
 		//assign u, u1, u2 to cuda
-		cudaMemcpy(u2_cuda, u2, sizeof(u2), cudaMemcpyHostToDevice);
-		cudaMemcpy(u1_cuda, u1, sizeof(u1), cudaMemcpyHostToDevice);
-		cudaMemcpy(u_cuda, u, sizeof(u), cudaMemcpyHostToDevice);
+		cudaMemcpy(u2_cuda, u2, arraySize, cudaMemcpyHostToDevice);
+		cudaMemcpy(u1_cuda, u1, arraySize, cudaMemcpyHostToDevice);
+		cudaMemcpy(u_cuda, u, arraySize, cudaMemcpyHostToDevice);
 
 		synthesis << < 1, num_of_threads >> > (u_cuda, u1_cuda, u2_cuda, p, eta, g, n, num_of_threads);
 		cudaDeviceSynchronize();
 
 		//get new u
-		cudaMemcpy(u, u_cuda, sizeof(u), cudaMemcpyDeviceToHost);
+		cudaMemcpy(u, u_cuda, arraySize, cudaMemcpyDeviceToHost);
 
 		//print out position u[n/2][n/2]
 		printf("iteration %d: position (%d, %d) = %f \n", t, n / 2, n / 2, u[(n / 2) * n + (n / 2)]);
@@ -130,8 +132,8 @@ int process_synthesis(int argc, char* argv[]) {
 		printf("%f %f %f %f \n", u[12], u[13], u[14], u[15]);*/
 
 		//update u1 and u2
-		memcpy(u2, u1, sizeof(u1));
-		memcpy(u1, u, sizeof(u1));
+		memcpy(u2, u1, arraySize);
+		memcpy(u1, u, arraySize);
 	}
 	
 

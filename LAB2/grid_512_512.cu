@@ -13,11 +13,11 @@
 __global__ void synthesis_512(float* u_cuda, float* u1_cuda, float* u2_cuda, float p, float eta, float g, int n, int num_of_elems_per_thread, int num_of_threads)
 {
 	//update all the interior elements
-	int index = threadIdx.x + blockIdx.x * blockDim.x;
-	index = index * num_of_elems_per_thread;
+	int index_temp = threadIdx.x + blockIdx.x * blockDim.x;
+	index_temp = index_temp * num_of_elems_per_thread;
 
 	for (int m = 0; m < num_of_elems_per_thread; m++) {
-		index += m;
+		int index = index_temp + m;
 		if (index < n * n) {
 			int i = index / n; //row
 			int j = index % n; //column

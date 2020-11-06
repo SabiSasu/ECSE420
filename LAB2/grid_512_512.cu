@@ -70,7 +70,7 @@ int process_synthesis_512(int argc, char* argv[]) {
 
 	// get arguments from command line
 	int num_of_iterations = atoi(argv[1]);
-	int mode = 1; //change as needded. can be 1, 2, 3, 4 or 5
+	int mode = 4; //change as needded. can be 1, 2, 3, 4 or 5
 	int n = 512; //array is n x n
 
 	float* u2; //previous previous array

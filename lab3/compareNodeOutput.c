@@ -49,4 +49,4 @@ FILE* fp2 = fopen(file_name2, "r");
 } 
 
 
-int main(int argc, char *argv[]){compareFiles("sol_nodeOutput.raw", "output/output_node.raw");}
+//int main(int argc, char *argv[]){compareFiles("sol_nodeOutput.raw", "output/output_node.raw");}

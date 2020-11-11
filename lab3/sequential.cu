@@ -119,6 +119,10 @@ int process_sequential(int argc, char* argv[]) {
 	//for (int loop = 0; loop < numNodePtrs; loop++)
 	//	printf("%d ", nodePtrs_h[loop]);
 
+
+	//start clock
+	clock_t begin = clock();
+
 	// Loop over all nodes in the current level
 	for (int idx = 0; idx < numCurrLevelNodes; idx++) {
 		int node = currLevelNodes_h[idx];
@@ -135,6 +139,11 @@ int process_sequential(int argc, char* argv[]) {
 			}
 		}
 	}
+
+	clock_t end = clock();
+
+	float time_spent = ((double)end - begin) / CLOCKS_PER_SEC * 1000;
+	printf("Execution time: %f milliseconds\n", time_spent);
 
 	//output results to respective files
 

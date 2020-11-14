@@ -103,7 +103,7 @@ int gate_solver(int gate, int output, int input) {
 	return result;
 }
 
-int process_block(int argc, char* argv[]) {
+int process_global(int argc, char* argv[]) {
 
 	//if (argc != 7)
 	//	return 0;
@@ -207,4 +207,4 @@ int process_block(int argc, char* argv[]) {
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_block(argc, argv); }
+int main(int argc, char* argv[]) { return process_global(argc, argv); }

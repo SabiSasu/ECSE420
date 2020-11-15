@@ -102,7 +102,7 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 
 				nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
 				++(*numNextLevelNodes_h);
-				printf("here: %d\n", *numNextLevelNodes_h);
+				//printf("here: %d\n", *numNextLevelNodes_h);
 			}
 		}
 	}
@@ -195,8 +195,8 @@ int process_block(int argc, char* argv[]) {
 	cudaEventCreate(&start); cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 
-	global_queuing_kernel << < num_of_blocks, num_of_threads >> > (block_queue_capacity, num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
-		currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
+	block_queuing_kernel << < num_of_blocks, num_of_threads >> > (block_queue_capacity, num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
+			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
 
 	cudaDeviceSynchronize();
 

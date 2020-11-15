@@ -16,7 +16,7 @@
 #define XOR 4
 #define XNOR 5
 
-int read_input_one_two_four(int** input1, char* filepath) {
+int read_input_one_two_four1(int** input1, char* filepath) {
 	FILE* fp = fopen(filepath, "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Couldn't open file for reading\n");
@@ -36,7 +36,7 @@ int read_input_one_two_four(int** input1, char* filepath) {
 	return len;
 }
 
-int read_input_three(int** input1, int** input2, int** input3, int** input4, char* filepath) {
+int read_input_three1(int** input1, int** input2, int** input3, int** input4, char* filepath) {
 	FILE* fp = fopen(filepath, "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Couldn't open file for reading\n");
@@ -64,14 +64,17 @@ int read_input_three(int** input1, int** input2, int** input3, int** input4, cha
 	return len;
 }
 
+__device__ int counter = 0; // initialise before running kernel
 
-__global__ void global_queuing_kernel(...){
+__global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int * numNextLevelNodes_h, 
+									int * currLevelNodes_h, int* nodePtrs_h, int * nodeNeighbors_h, int * nodeVisited_h, 
+									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h){
 	int i = threadIdx.x + (blockIdx.x * blockDim.x);
 
 	//im guessing this is the same as sequential but we loop over a particular interval of nodes based on thread number?
 
 	// Loop over all nodes in the current level
-	for (int idx = i; idx < numCurrLevelNodes; idx++) {
+	for (int idx = i; idx < numCurrLevelNodes; idx+= threadNum) {
 		int node = currLevelNodes_h[idx];
 		// Loop over all neighbors of the node
 		for (int nbrIdx = nodePtrs_h[node]; nbrIdx < nodePtrs_h[node + 1]; nbrIdx++) {
@@ -80,28 +83,30 @@ __global__ void global_queuing_kernel(...){
 			if (!nodeVisited_h[neighbor]) {
 				// Mark it and add it to the queue
 				nodeVisited_h[neighbor] = 1;
-				nodeOutput_h[neighbor] = gate_solver(nodeGate_h[neighbor], nodeOutput_h[node], nodeInput_h[neighbor]);
-				nextLevelNodes_h[numNextLevelNodes_h] = neighbor;
-				++(numNextLevelNodes_h);
+
+				//solve gate
+				int result = 0;
+				int output = nodeOutput_h[node];
+				int input = nodeInput_h[neighbor];
+				switch (nodeGate_h[neighbor]) {
+				case AND: result = output & input;  break;
+				case OR: result = output | input; break;
+				case NAND: result = !(output & input); break;
+				case NOR: result = !(output | input); break;
+				case XOR: result = ((!output & input) | (output & !input)); break;
+				case XNOR: result = !((!output & input) | (output & !input)); break;
+				}
+
+				nodeOutput_h[neighbor] = result;
+				
+				nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
+				++(*numNextLevelNodes_h);
+				printf("here: %d\n", *numNextLevelNodes_h);
 			}
 		}
 	}
 }
 
-
-
-int gate_solver(int gate, int output, int input) {
-	int result = 0;
-	switch (gate) {
-	case AND: result = output & input;  break;
-	case OR: result = output | input; break;
-	case NAND: result = !(output & input); break;
-	case NOR: result = !(output | input); break;
-	case XOR: result = ((!output & input) | (output & !input)); break;
-	case XNOR: result = !((!output & input) | (output & !input)); break;
-	}
-	return result;
-}
 
 int process_global(int argc, char* argv[]) {
 
@@ -120,23 +125,23 @@ int process_global(int argc, char* argv[]) {
 	int num_of_threads = 0;
 	int num_of_blocks = 0;
 
-	if (mode == 1) { //16 blocks, 16 elements by thread, 32 rows per block, 32 threads per row
+	if (mode == 1) { 
 		num_of_threads = 10;
 		num_of_blocks = 32;
 	}
-	else if (mode == 2) { //512 blocks, 1 element by thread, 1 row per block, 512 threads per row
+	else if (mode == 2) {
 		num_of_threads = 25;
 		num_of_blocks = 32;
 	}
-	else if (mode == 3) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+	else if (mode == 3) { 
 		num_of_threads = 25;
 		num_of_blocks = 64;
 	}
-	else if (mode == 4) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+	else if (mode == 4) { 
 		num_of_threads = 35;
 		num_of_blocks = 64;
 	}
-	else if (mode == 5) { //64 blocks, 4 elements by thread, 8 rows per block, 128 threads per row
+	else if (mode == 5) { 
 		num_of_threads = 35;
 		num_of_blocks = 128;
 	}
@@ -151,19 +156,42 @@ int process_global(int argc, char* argv[]) {
 	int numTotalNeighbors_h;
 	int* currLevelNodes_h;
 	int numCurrLevelNodes;
-	int numNextLevelNodes_h = 0;
+	int* numNextLevelNodes_h;
 	int* nodeGate_h;
 	int* nodeInput_h;
 	int* nodeOutput_h;
 
-	numNodePtrs = read_input_one_two_four(&nodePtrs_h, input_filename1);
-	numTotalNeighbors_h = read_input_one_two_four(&nodeNeighbors_h, input_filename2);
-	numNodes = read_input_three(&nodeVisited_h, &nodeGate_h, &nodeInput_h, &nodeOutput_h, input_filename3);
-	numCurrLevelNodes = read_input_one_two_four(&currLevelNodes_h, input_filename4);
+	numNodePtrs = read_input_one_two_four1(&nodePtrs_h, input_filename1);
+	numTotalNeighbors_h = read_input_one_two_four1(&nodeNeighbors_h, input_filename2);
+	numNodes = read_input_three1(&nodeVisited_h, &nodeGate_h, &nodeInput_h, &nodeOutput_h, input_filename3);
+	numCurrLevelNodes = read_input_one_two_four1(&currLevelNodes_h, input_filename4);
 
 	//output
 	int* nextLevelNodes_h = (int*)malloc(numNodePtrs * sizeof(int));
 
+	//initialize cuda vars
+	int* currLevelNodes_c, int* nodePtrs_c, int* nodeNeighbors_c, int* nodeVisited_c,
+		int* nodeGate_c, int* nodeInput_c, int* nodeOutput_c, int* nextLevelNodes_c;
+	cudaMalloc(&currLevelNodes_c, numCurrLevelNodes);
+	cudaMalloc(&nodePtrs_c, numNodePtrs);
+	cudaMalloc(&nodeNeighbors_c, numTotalNeighbors_h);
+	cudaMalloc(&nodeVisited_c, numNodes);
+	cudaMalloc(&nodeGate_c, numNodes);
+	cudaMalloc(&nodeInput_c, numNodes);
+	cudaMalloc(&nodeOutput_c, numNodes);
+	cudaMalloc(&nextLevelNodes_c, numNodes);
+
+	cudaMemcpy(currLevelNodes_c, currLevelNodes_h, numCurrLevelNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodePtrs_c, nodePtrs_h, numNodePtrs, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeNeighbors_c, nodeNeighbors_h, numTotalNeighbors_h, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeVisited_c, nodeVisited_h, numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeGate_c, nodeGate_h, numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeInput_c, nodeInput_h, numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeOutput_c, nodeOutput_h, numNodes, cudaMemcpyHostToDevice);
+	//cudaMemcpy(nextLevelNodes_c, nextLevelNodes_h, numNodes, cudaMemcpyHostToDevice);
+
+	cudaMallocManaged(&numNextLevelNodes_h, 4);
+	*numNextLevelNodes_h = 0;
 
 	//start timer for execution runtime 
 	float memsettime;
@@ -171,7 +199,10 @@ int process_global(int argc, char* argv[]) {
 	cudaEventCreate(&start); cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 
-	global_queuing_kernel << < num_of_blocks, num_of_threads >> > (...);
+
+	global_queuing_kernel << < num_of_blocks, num_of_threads >> > (num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
+			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
+	cudaDeviceSynchronize();
 
 	//stop timer
 	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
@@ -179,8 +210,22 @@ int process_global(int argc, char* argv[]) {
 	printf("Global queueing: ran in %f milliseconds\n", memsettime);
 	cudaEventDestroy(start); cudaEventDestroy(stop);
 
-	//output results to respective files
 
+	//free cuda memory
+	cudaMemcpy(nodeOutput_h, nodeOutput_c, numNodePtrs, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nextLevelNodes_h, nextLevelNodes_c, *numNextLevelNodes_h, cudaMemcpyDeviceToHost);
+	
+	cudaFree(currLevelNodes_c);
+	cudaFree(nodePtrs_c);
+	cudaFree(nodeNeighbors_c);
+	cudaFree(nodeVisited_c);
+	cudaFree(nodeGate_c);
+	cudaFree(nodeInput_c);
+	cudaFree(nodeOutput_c);
+	cudaFree(nextLevelNodes_c);
+
+
+	//output results to respective files
 	FILE* output_file_node;
 	FILE* output_file_next;
 	if ((output_file_node = fopen(output_node_filename, "w")) == NULL) {
@@ -191,19 +236,13 @@ int process_global(int argc, char* argv[]) {
 		printf("Error! opening file");
 		exit(1);
 	}
-	//first line is the length
-	fprintf(output_file_node, "%d\n", numNodePtrs - 1);
-	for (int loop = 0; loop < numNodePtrs - 1; loop++)
-		fprintf(output_file_node, "%d\n", nodeOutput_h[loop]);
+
+	fwrite(nodeOutput_h, 1, numNodePtrs, output_file_node);
 	fclose(output_file_node);
-
-	fprintf(output_file_node, "%d\n", numNextLevelNodes_h);
-	for (int loop = 0; loop < numNextLevelNodes_h; loop++)
-		fprintf(output_file_next, "%d\n", nextLevelNodes_h[loop]);
-
-
+	fwrite(nextLevelNodes_h, 1, *numNextLevelNodes_h, output_file_next);
 	fclose(output_file_next);
-
+	printf("belh %d\n", *numNextLevelNodes_h);
+	
 	return 0;
 }
 

@@ -69,8 +69,11 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 	int* currLevelNodes_h, int* nodePtrs_h, int* nodeNeighbors_h, int* nodeVisited_h,
 	int* nodeGate_h, int* nodeInput_h, int* nodeOutput_h, int* nextLevelNodes_h) {
 
-
-	int i = threadIdx.x + (blockIdx.x * blockDim.x);
+	extern __shared__ int shared_mem_queue[];
+	int i = threadIdx.x + (blockIdx.x * blockDim.x);	
+	__shared__ int counter; //counter = 0 here
+	//printf("counter: %d\n", counter);
+	//printf("%d\n", sizeof(shared_mem_queue) / sizeof(int));
 
 	//im guessing this is the same as sequential but we loop over a particular interval of nodes based on thread number?
 
@@ -84,7 +87,7 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 			if (!nodeVisited_h[neighbor]) {
 				// Mark it and add it to the queue
 				nodeVisited_h[neighbor] = 1;
-
+				
 				//solve gate
 				int result = 0;
 				int output = nodeOutput_h[node];
@@ -99,16 +102,41 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 				}
 
 				nodeOutput_h[neighbor] = result;
-
-				nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
-				++(*numNextLevelNodes_h);
+				atomicAdd(&counter, 1); //we are going to add an entry to the shared mem queue
+				//printf("right after add\n");
+				//printf("counter: %d\n", counter);
+				if (counter >= block_queue_capacity) { //queue full
+					//printf("inside if before\n");
+					nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
+					++(*numNextLevelNodes_h);
+					//printf("inside if\n");
+				}
+				else {
+					shared_mem_queue[counter - 1] = neighbor; //adding neighbor to shared mem queue
+					__syncthreads();
+					//nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
+					//printf("inside else\n");
+				}
+				//printf("before sync\n");
+				__syncthreads();
+				//printf("after sync\n");
+				//++(*numNextLevelNodes_h);
+				
+				//printf("after ++\n");
 				//printf("here: %d\n", *numNextLevelNodes_h);
 			}
 		}
 	}
-
+	//printf("hello");
+	//for (int i = 0; i < block_queue_capacity; i++) {
+	//	printf("%d\n", shared_mem_queue[i]);
+	//}
 	//allocate space for block queue to go into global queue
 	//store block queue in global queue
+	for (int i = 0; i < block_queue_capacity; i++) {
+		nextLevelNodes_h[*numNextLevelNodes_h] = shared_mem_queue[i];
+		++(*numNextLevelNodes_h);
+	}
 }
 
 
@@ -195,7 +223,7 @@ int process_block(int argc, char* argv[]) {
 	cudaEventCreate(&start); cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 
-	block_queuing_kernel << < num_of_blocks, num_of_threads >> > (block_queue_capacity, num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
+	block_queuing_kernel << < num_of_blocks, num_of_threads, (block_queue_capacity * sizeof(int)) >> > (block_queue_capacity, num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
 			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
 
 	cudaDeviceSynchronize();
@@ -203,7 +231,7 @@ int process_block(int argc, char* argv[]) {
 	//stop timer
 	cudaEventRecord(stop, 0); cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&memsettime, start, stop);
-	printf("Global queueing: ran in %f milliseconds\n", memsettime);
+	printf("Block queueing: ran in %f milliseconds\n", memsettime);
 	cudaEventDestroy(start); cudaEventDestroy(stop);
 
 
@@ -242,4 +270,4 @@ int process_block(int argc, char* argv[]) {
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_block(argc, argv); }
+//int main(int argc, char* argv[]) { return process_block(argc, argv); }

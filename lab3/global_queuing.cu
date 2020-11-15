@@ -64,8 +64,6 @@ int read_input_three1(int** input1, int** input2, int** input3, int** input4, ch
 	return len;
 }
 
-__device__ int counter = 0; // initialise before running kernel
-
 __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int * numNextLevelNodes_h, 
 									int * currLevelNodes_h, int* nodePtrs_h, int * nodeNeighbors_h, int * nodeVisited_h, 
 									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h){
@@ -241,9 +239,9 @@ int process_global(int argc, char* argv[]) {
 	fclose(output_file_node);
 	fwrite(nextLevelNodes_h, 1, *numNextLevelNodes_h, output_file_next);
 	fclose(output_file_next);
-	printf("belh %d\n", *numNextLevelNodes_h);
+	//printf("belh %d\n", *numNextLevelNodes_h);
 	
 	return 0;
 }
 
-int main(int argc, char* argv[]) { return process_global(argc, argv); }
+//int main(int argc, char* argv[]) { return process_global(argc, argv); }

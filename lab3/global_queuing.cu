@@ -101,10 +101,6 @@ __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int 
 				
 				nextLevelNodes_h[atomicAdd(&count, 1)] = neighbor;
 				*numNextLevelNodes_h = count;
-				//printf("count is %d\n", *numNextLevelNodes_h);
-			
-				
-				//printf("count is %d\n", *numNextLevelNodes_h);
 			}
 		}
 	}
@@ -123,30 +119,22 @@ int process_global(int argc, char* argv[]) {
 	char* output_node_filename = "output/output_node.raw";//argv[5];
 	char* output_next_node_filename = "output/output_next_node.raw";//argv[6];
 
-	int mode = 1;
+	int mode = 2;
 	//number of threads
 	int num_of_threads = 0;
 	int num_of_blocks = 0;
 
 	if (mode == 1) { 
 		num_of_threads = 32;
-		num_of_blocks = 25;
+		num_of_blocks = 35;
 	}
 	else if (mode == 2) {
 		num_of_threads = 64;
-		num_of_blocks = 10;
+		num_of_blocks = 35;
 	}
 	else if (mode == 3) { 
-		num_of_threads = 25;
-		num_of_blocks = 64;
-	}
-	else if (mode == 4) { 
-		num_of_threads = 35;
-		num_of_blocks = 64;
-	}
-	else if (mode == 5) { 
-		num_of_threads = 35;
-		num_of_blocks = 128;
+		num_of_threads = 128;
+		num_of_blocks = 25;
 	}
 
 	//Code provided:
@@ -242,8 +230,6 @@ int process_global(int argc, char* argv[]) {
 		printf("Error! opening file");
 		exit(1);
 	}
-
-	
 
 	fprintf(output_file_node, "%d\n", numNodePtrs - 1);
 	for (int loop = 0; loop < numNodePtrs - 1; loop++)

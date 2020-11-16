@@ -109,15 +109,23 @@ __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int 
 
 int process_global(int argc, char* argv[]) {
 
-	//if (argc != 7)
-	//	return 0;
-	// get arguments from command line
+	//default values
 	char* input_filename1 = "input1.raw";//argv[1];
 	char* input_filename2 = "input2.raw";//argv[2];
 	char* input_filename3 = "input3.raw";//argv[3];
 	char* input_filename4 = "input4.raw";//argv[4];
 	char* output_node_filename = "output/output_node.raw";//argv[5];
 	char* output_next_node_filename = "output/output_next_node.raw";//argv[6];
+
+	//if we have the arguments from cmd, take them instead
+	if (argc == 7) {
+		char* input_filename1 = argv[1];
+		char* input_filename2 = argv[2];
+		char* input_filename3 = argv[3];
+		char* input_filename4 = argv[4];
+		char* output_node_filename = argv[5];
+		char* output_next_node_filename = argv[6];
+	}
 
 	int mode = 2;
 	//number of threads
@@ -170,7 +178,7 @@ int process_global(int argc, char* argv[]) {
 	cudaMalloc(&nodeGate_c, numNodes * sizeof(int));
 	cudaMalloc(&nodeInput_c, numNodes * sizeof(int));
 	cudaMalloc(&nodeOutput_c, numNodes * sizeof(int));
-	cudaMalloc(&nextLevelNodes_c, 40101 * sizeof(int));
+	cudaMalloc(&nextLevelNodes_c, numNodes * sizeof(int));
 
 	cudaMemcpy(currLevelNodes_c, currLevelNodes_h, numCurrLevelNodes * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(nodePtrs_c, nodePtrs_h, numNodePtrs * sizeof(int), cudaMemcpyHostToDevice);
@@ -179,7 +187,7 @@ int process_global(int argc, char* argv[]) {
 	cudaMemcpy(nodeGate_c, nodeGate_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(nodeInput_c, nodeInput_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(nodeOutput_c, nodeOutput_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
-	cudaMemcpy(nextLevelNodes_c, nextLevelNodes_h, 40101 * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nextLevelNodes_c, nextLevelNodes_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
 
 	cudaMallocManaged(&numNextLevelNodes_h, sizeof(int));
 	*numNextLevelNodes_h = 0;

@@ -66,13 +66,13 @@ int read_input_three1(int** input1, int** input2, int** input3, int** input4, ch
 
 __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int * numNextLevelNodes_h, 
 									int * currLevelNodes_h, int* nodePtrs_h, int * nodeNeighbors_h, int * nodeVisited_h, 
-									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h){
+									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h, int numCurrLevelNodesPerThread){
 	int i = threadIdx.x + (blockIdx.x * blockDim.x);
 
 	//im guessing this is the same as sequential but we loop over a particular interval of nodes based on thread number?
 
 	// Loop over all nodes in the current level
-	for (int idx = i; idx < numCurrLevelNodes; idx+= threadNum) {
+	for (int idx = i; idx < numCurrLevelNodesPerThread; idx++) {
 		int node = currLevelNodes_h[idx];
 		// Loop over all neighbors of the node
 		for (int nbrIdx = nodePtrs_h[node]; nbrIdx < nodePtrs_h[node + 1]; nbrIdx++) {
@@ -191,6 +191,8 @@ int process_global(int argc, char* argv[]) {
 	cudaMallocManaged(&numNextLevelNodes_h, 4);
 	*numNextLevelNodes_h = 0;
 
+	int numCurrLevelNodesPerThread = (numCurrLevelNodes - 1) / (num_of_blocks * num_of_threads);
+
 	//start timer for execution runtime 
 	float memsettime;
 	cudaEvent_t start, stop;
@@ -199,7 +201,7 @@ int process_global(int argc, char* argv[]) {
 
 
 	global_queuing_kernel << < num_of_blocks, num_of_threads >> > (num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
-			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
+			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c, numCurrLevelNodesPerThread);
 	cudaDeviceSynchronize();
 
 	//stop timer

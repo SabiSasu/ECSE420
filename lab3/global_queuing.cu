@@ -98,8 +98,9 @@ __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int 
 				}
 
 				nodeOutput_h[neighbor] = result;
-				*numNextLevelNodes_h = count + 2 + threadNum - blocknum;
+				
 				nextLevelNodes_h[atomicAdd(&count, 1)] = neighbor;
+				*numNextLevelNodes_h = count;
 				//printf("count is %d\n", *numNextLevelNodes_h);
 			
 				

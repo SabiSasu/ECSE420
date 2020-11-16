@@ -64,21 +64,20 @@ int read_input_three2(int** input1, int** input2, int** input3, int** input4, ch
 	return len;
 }
 
-
+__device__ int device_count = 0;
 __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, int numCurrLevelNodes, int* numNextLevelNodes_h,
 	int* currLevelNodes_h, int* nodePtrs_h, int* nodeNeighbors_h, int* nodeVisited_h,
 	int* nodeGate_h, int* nodeInput_h, int* nodeOutput_h, int* nextLevelNodes_h) {
 
 	extern __shared__ int shared_mem_queue[];
 	int i = threadIdx.x + (blockIdx.x * blockDim.x);	
+	int stride = blockDim.x * gridDim.x;
 	__shared__ int counter; //counter = 0 here
 	//printf("counter: %d\n", counter);
 	//printf("%d\n", sizeof(shared_mem_queue) / sizeof(int));
 
-	//im guessing this is the same as sequential but we loop over a particular interval of nodes based on thread number?
-
 	// Loop over all nodes in the current level
-	for (int idx = i; idx < numCurrLevelNodes; idx += threadNum) {
+	for (int idx = i; idx < numCurrLevelNodes; idx += stride) {
 		int node = currLevelNodes_h[idx];
 		// Loop over all neighbors of the node
 		for (int nbrIdx = nodePtrs_h[node]; nbrIdx < nodePtrs_h[node + 1]; nbrIdx++) {
@@ -93,29 +92,29 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 				int output = nodeOutput_h[node];
 				int input = nodeInput_h[neighbor];
 				switch (nodeGate_h[neighbor]) {
-				case AND: result = output & input;  break;
-				case OR: result = output | input; break;
-				case NAND: result = !(output & input); break;
-				case NOR: result = !(output | input); break;
-				case XOR: result = ((!output & input) | (output & !input)); break;
-				case XNOR: result = !((!output & input) | (output & !input)); break;
+					case AND: result = output & input;  break;
+					case OR: result = output | input; break;
+					case NAND: result = !(output & input); break;
+					case NOR: result = !(output | input); break;
+					case XOR: result = ((!output & input) | (output & !input)); break;
+					case XNOR: result = !((!output & input) | (output & !input)); break;
 				}
 
 				nodeOutput_h[neighbor] = result;
-				atomicAdd(&counter, 1); //we are going to add an entry to the shared mem queue
+				//atomicAdd(&counter, 1); //we are going to add an entry to the shared mem queue
 				//printf("right after add\n");
 				//printf("counter: %d\n", counter);
 				if (counter >= block_queue_capacity) { //queue full
 					//printf("inside if before\n");
-					nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
-					++(*numNextLevelNodes_h);
+					nextLevelNodes_h[atomicAdd(&device_count, 1)] = neighbor;
+					*numNextLevelNodes_h = device_count;
 					//printf("inside if\n");
 				}
 				else {
-					shared_mem_queue[counter - 1] = neighbor; //adding neighbor to shared mem queue
+					shared_mem_queue[atomicAdd(&counter, 1)] = neighbor; //adding neighbor to shared mem queue
 					__syncthreads();
 					//nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
-					//printf("inside else\n");
+					
 				}
 				//printf("before sync\n");
 				__syncthreads();
@@ -134,8 +133,9 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 	//allocate space for block queue to go into global queue
 	//store block queue in global queue
 	for (int i = 0; i < block_queue_capacity; i++) {
-		nextLevelNodes_h[*numNextLevelNodes_h] = shared_mem_queue[i];
-		++(*numNextLevelNodes_h);
+		printf("inside else %d\n", shared_mem_queue[i]);
+		nextLevelNodes_h[atomicAdd(&device_count, 1)] = shared_mem_queue[i];
+		*numNextLevelNodes_h = device_count;
 	}
 }
 
@@ -160,8 +160,8 @@ int process_block(int argc, char* argv[]) {
 	int block_queue_capacity = 0;
 
 	if (mode == 1) { //32 threads per block, 25 blocks, 32 queue capacity
-		num_of_threads = 32;
-		num_of_blocks = 25;
+		num_of_threads = 1;
+		num_of_blocks = 10;
 		block_queue_capacity = 32;
 	}
 	else if (mode == 2) { //64 threads per block, 35 blocks, 64 queue capacity
@@ -170,7 +170,6 @@ int process_block(int argc, char* argv[]) {
 		block_queue_capacity = 64;
 	}
 	
-	//Code provided:
 	//Variables
 	int numNodePtrs;
 	int numNodes;
@@ -180,7 +179,7 @@ int process_block(int argc, char* argv[]) {
 	int numTotalNeighbors_h;
 	int* currLevelNodes_h;
 	int numCurrLevelNodes;
-	int* numNextLevelNodes_h = 0;
+	int* numNextLevelNodes_h;
 	int* nodeGate_h;
 	int* nodeInput_h;
 	int* nodeOutput_h;
@@ -190,31 +189,31 @@ int process_block(int argc, char* argv[]) {
 	numNodes = read_input_three2(&nodeVisited_h, &nodeGate_h, &nodeInput_h, &nodeOutput_h, input_filename3);
 	numCurrLevelNodes = read_input_one_two_four2(&currLevelNodes_h, input_filename4);
 
-	//output aka global queue
+	//output
 	int* nextLevelNodes_h = (int*)malloc(numNodePtrs * sizeof(int));
 
 	//initialize cuda vars
 	int* currLevelNodes_c, int* nodePtrs_c, int* nodeNeighbors_c, int* nodeVisited_c,
 		int* nodeGate_c, int* nodeInput_c, int* nodeOutput_c, int* nextLevelNodes_c;
-	cudaMalloc(&currLevelNodes_c, numCurrLevelNodes);
-	cudaMalloc(&nodePtrs_c, numNodePtrs);
-	cudaMalloc(&nodeNeighbors_c, numTotalNeighbors_h);
-	cudaMalloc(&nodeVisited_c, numNodes);
-	cudaMalloc(&nodeGate_c, numNodes);
-	cudaMalloc(&nodeInput_c, numNodes);
-	cudaMalloc(&nodeOutput_c, numNodes);
-	cudaMalloc(&nextLevelNodes_c, numNodes);
+	cudaMalloc(&currLevelNodes_c, numCurrLevelNodes * sizeof(int));
+	cudaMalloc(&nodePtrs_c, numNodePtrs * sizeof(int));
+	cudaMalloc(&nodeNeighbors_c, numTotalNeighbors_h * sizeof(int));
+	cudaMalloc(&nodeVisited_c, numNodes * sizeof(int));
+	cudaMalloc(&nodeGate_c, numNodes * sizeof(int));
+	cudaMalloc(&nodeInput_c, numNodes * sizeof(int));
+	cudaMalloc(&nodeOutput_c, numNodes * sizeof(int));
+	cudaMalloc(&nextLevelNodes_c, numNodes * sizeof(int));
 
-	cudaMemcpy(currLevelNodes_c, currLevelNodes_h, numCurrLevelNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodePtrs_c, nodePtrs_h, numNodePtrs, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodeNeighbors_c, nodeNeighbors_h, numTotalNeighbors_h, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodeVisited_c, nodeVisited_h, numNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodeGate_c, nodeGate_h, numNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodeInput_c, nodeInput_h, numNodes, cudaMemcpyHostToDevice);
-	cudaMemcpy(nodeOutput_c, nodeOutput_h, numNodes, cudaMemcpyHostToDevice);
-	//cudaMemcpy(nextLevelNodes_c, nextLevelNodes_h, numNodes, cudaMemcpyHostToDevice);
+	cudaMemcpy(currLevelNodes_c, currLevelNodes_h, numCurrLevelNodes * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodePtrs_c, nodePtrs_h, numNodePtrs * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeNeighbors_c, nodeNeighbors_h, numTotalNeighbors_h * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeVisited_c, nodeVisited_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeGate_c, nodeGate_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeInput_c, nodeInput_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nodeOutput_c, nodeOutput_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(nextLevelNodes_c, nextLevelNodes_h, numNodes * sizeof(int), cudaMemcpyHostToDevice);
 
-	cudaMallocManaged(&numNextLevelNodes_h, 4);
+	cudaMallocManaged(&numNextLevelNodes_h, sizeof(int));
 	*numNextLevelNodes_h = 0;
 
 	//start timer for execution runtime 
@@ -236,8 +235,8 @@ int process_block(int argc, char* argv[]) {
 
 
 	//free cuda memory
-	cudaMemcpy(nodeOutput_h, nodeOutput_c, numNodePtrs, cudaMemcpyDeviceToHost);
-	cudaMemcpy(nextLevelNodes_h, nextLevelNodes_c, *numNextLevelNodes_h, cudaMemcpyDeviceToHost);
+	cudaMemcpy(nodeOutput_h, nodeOutput_c, (numNodePtrs - 1) * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(nextLevelNodes_h, nextLevelNodes_c, *numNextLevelNodes_h * sizeof(int), cudaMemcpyDeviceToHost);
 
 	cudaFree(currLevelNodes_c);
 	cudaFree(nodePtrs_c);
@@ -261,13 +260,17 @@ int process_block(int argc, char* argv[]) {
 		exit(1);
 	}
 
-	fwrite(nodeOutput_h, 1, numNodePtrs, output_file_node);
+	fprintf(output_file_node, "%d\n", numNodePtrs - 1);
+	for (int loop = 0; loop < numNodePtrs - 1; loop++)
+		fprintf(output_file_node, "%d\n", nodeOutput_h[loop]);
 	fclose(output_file_node);
-	fwrite(nextLevelNodes_h, 1, *numNextLevelNodes_h, output_file_next);
+
+	fprintf(output_file_next, "%d\n", *numNextLevelNodes_h);
+	for (int loop = 0; loop < *numNextLevelNodes_h; loop++)
+		fprintf(output_file_next, "%d\n", nextLevelNodes_h[loop]);
 	fclose(output_file_next);
-	//printf("belh %d\n", *numNextLevelNodes_h);
 
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_block(argc, argv); }
+int main(int argc, char* argv[]) { return process_block(argc, argv); }

@@ -164,7 +164,7 @@ int process_sequential(int argc, char* argv[]) {
 	fclose(output_file_node);
 
 	fprintf(output_file_next, "%d\n", numNextLevelNodes_h);
-	for(int loop = 0; loop < numNextLevelNodes_h; loop++)
+	for(int loop = 0; loop < numNextLevelNodes_h-1; loop++)
 		fprintf(output_file_next, "%d\n", nextLevelNodes_h[loop]);
 
 	

@@ -64,15 +64,16 @@ int read_input_three1(int** input1, int** input2, int** input3, int** input4, ch
 	return len;
 }
 
+
 __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int * numNextLevelNodes_h, 
 									int * currLevelNodes_h, int* nodePtrs_h, int * nodeNeighbors_h, int * nodeVisited_h, 
-									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h, int numCurrLevelNodesPerThread){
+									int * nodeGate_h, int * nodeInput_h, int * nodeOutput_h, int * nextLevelNodes_h){
 	int i = threadIdx.x + (blockIdx.x * blockDim.x);
-
-	//im guessing this is the same as sequential but we loop over a particular interval of nodes based on thread number?
-
+	int stride = blockDim.x * gridDim.x;
+	
 	// Loop over all nodes in the current level
-	for (int idx = i; idx < numCurrLevelNodesPerThread; idx++) {
+
+	for (int idx = i; idx < numCurrLevelNodes; idx+= stride) {
 		int node = currLevelNodes_h[idx];
 		// Loop over all neighbors of the node
 		for (int nbrIdx = nodePtrs_h[node]; nbrIdx < nodePtrs_h[node + 1]; nbrIdx++) {
@@ -87,19 +88,18 @@ __global__ void global_queuing_kernel(int threadNum, int numCurrLevelNodes, int 
 				int output = nodeOutput_h[node];
 				int input = nodeInput_h[neighbor];
 				switch (nodeGate_h[neighbor]) {
-				case AND: result = output & input;  break;
-				case OR: result = output | input; break;
-				case NAND: result = !(output & input); break;
-				case NOR: result = !(output | input); break;
-				case XOR: result = ((!output & input) | (output & !input)); break;
-				case XNOR: result = !((!output & input) | (output & !input)); break;
+					case AND: result = output & input;  break;
+					case OR: result = output | input; break;
+					case NAND: result = !(output & input); break;
+					case NOR: result = !(output | input); break;
+					case XOR: result = ((!output & input) | (output & !input)); break;
+					case XNOR: result = !((!output & input) | (output & !input)); break;
 				}
 
 				nodeOutput_h[neighbor] = result;
 				
 				nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
-				++(*numNextLevelNodes_h);
-				printf("here: %d\n", *numNextLevelNodes_h);
+				atomicAdd(numNextLevelNodes_h, 1);
 			}
 		}
 	}
@@ -118,18 +118,18 @@ int process_global(int argc, char* argv[]) {
 	char* output_node_filename = "output/output_node.raw";//argv[5];
 	char* output_next_node_filename = "output/output_next_node.raw";//argv[6];
 
-	int mode = 1;
+	int mode = 2;
 	//number of threads
 	int num_of_threads = 0;
 	int num_of_blocks = 0;
 
 	if (mode == 1) { 
-		num_of_threads = 10;
-		num_of_blocks = 32;
+		num_of_threads = 32;
+		num_of_blocks = 10;
 	}
 	else if (mode == 2) {
-		num_of_threads = 25;
-		num_of_blocks = 32;
+		num_of_threads = 64;
+		num_of_blocks = 10;
 	}
 	else if (mode == 3) { 
 		num_of_threads = 25;
@@ -201,7 +201,7 @@ int process_global(int argc, char* argv[]) {
 
 
 	global_queuing_kernel << < num_of_blocks, num_of_threads >> > (num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
-			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c, numCurrLevelNodesPerThread);
+			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
 	cudaDeviceSynchronize();
 
 	//stop timer
@@ -237,13 +237,20 @@ int process_global(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	
+
 	fwrite(nodeOutput_h, 1, numNodePtrs, output_file_node);
 	fclose(output_file_node);
-	fwrite(nextLevelNodes_h, 1, *numNextLevelNodes_h, output_file_next);
+	//fprintf(output_file_next, "%d\n", *numNextLevelNodes_h);
+	//fwrite(numNextLevelNodes_h, 1, 1, output_file_next);
+	//fwrite(nextLevelNodes_h, 1, *numNextLevelNodes_h, output_file_next);
+	fprintf(output_file_next, "%d\n", *numNextLevelNodes_h);
+	for (int loop = 0; loop < *numNextLevelNodes_h; loop++)
+		fprintf(output_file_next, "%d\n", nextLevelNodes_h[loop]);
 	fclose(output_file_next);
 	//printf("belh %d\n", *numNextLevelNodes_h);
 	
 	return 0;
 }
 
-//int main(int argc, char* argv[]) { return process_global(argc, argv); }
+int main(int argc, char* argv[]) { return process_global(argc, argv); }

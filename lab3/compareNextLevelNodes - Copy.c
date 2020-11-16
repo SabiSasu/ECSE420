@@ -70,4 +70,4 @@ void compareNextLevelNodeFiles(char *file_name1, char *file_name2)
 
 } 
 
-//int main(int argc, char *argv[]){compareNextLevelNodeFiles(argv[1], argv[2]);}
+//int main(int argc, char *argv[]){compareNextLevelNodeFiles("sol_nextLevelNodes.raw", "output/output_next_node.raw");}

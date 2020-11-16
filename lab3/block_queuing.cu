@@ -70,7 +70,7 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 	int* nodeGate_h, int* nodeInput_h, int* nodeOutput_h, int* nextLevelNodes_h) {
 
 	extern __shared__ int shared_mem_queue[];
-	int i = threadIdx.x + (blockIdx.x * blockDim.x);	
+	int i = threadIdx.x + (blockIdx.x * blockDim.x);
 	int stride = blockDim.x * gridDim.x;
 	__shared__ int counter; //counter = 0 here
 	//printf("counter: %d\n", counter);
@@ -86,27 +86,28 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 			if (!nodeVisited_h[neighbor]) {
 				// Mark it and add it to the queue
 				nodeVisited_h[neighbor] = 1;
-				
+
 				//solve gate
 				int result = 0;
 				int output = nodeOutput_h[node];
 				int input = nodeInput_h[neighbor];
 				switch (nodeGate_h[neighbor]) {
-					case AND: result = output & input;  break;
-					case OR: result = output | input; break;
-					case NAND: result = !(output & input); break;
-					case NOR: result = !(output | input); break;
-					case XOR: result = ((!output & input) | (output & !input)); break;
-					case XNOR: result = !((!output & input) | (output & !input)); break;
+				case AND: result = output & input;  break;
+				case OR: result = output | input; break;
+				case NAND: result = !(output & input); break;
+				case NOR: result = !(output | input); break;
+				case XOR: result = ((!output & input) | (output & !input)); break;
+				case XNOR: result = !((!output & input) | (output & !input)); break;
 				}
 
 				nodeOutput_h[neighbor] = result;
 				//atomicAdd(&counter, 1); //we are going to add an entry to the shared mem queue
 				//printf("right after add\n");
 				//printf("counter: %d\n", counter);
-				if (counter >= block_queue_capacity) { //queue full
+				if (counter >= block_queue_capacity - 5) { //queue full
 					//printf("inside if before\n");
 					nextLevelNodes_h[atomicAdd(&device_count, 1)] = neighbor;
+					__syncthreads();
 					*numNextLevelNodes_h = device_count;
 					//printf("inside if\n");
 				}
@@ -114,13 +115,13 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 					shared_mem_queue[atomicAdd(&counter, 1)] = neighbor; //adding neighbor to shared mem queue
 					__syncthreads();
 					//nextLevelNodes_h[*numNextLevelNodes_h] = neighbor;
-					
+
 				}
 				//printf("before sync\n");
 				__syncthreads();
 				//printf("after sync\n");
 				//++(*numNextLevelNodes_h);
-				
+
 				//printf("after ++\n");
 				//printf("here: %d\n", *numNextLevelNodes_h);
 			}
@@ -132,11 +133,14 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 	//}
 	//allocate space for block queue to go into global queue
 	//store block queue in global queue
-	for (int i = 0; i < block_queue_capacity; i++) {
-		printf("inside else %d\n", shared_mem_queue[i]);
-		nextLevelNodes_h[atomicAdd(&device_count, 1)] = shared_mem_queue[i];
+	//for (int i = 0; i < block_queue_capacity; i++) {
+		printf("threadnum: %d, content: %d\n", threadIdx.x, shared_mem_queue[threadIdx.x
+		]);
+		__syncthreads();
+		nextLevelNodes_h[atomicAdd(&device_count, 1)] = shared_mem_queue[threadIdx.x];
+		__syncthreads();
 		*numNextLevelNodes_h = device_count;
-	}
+	//}
 }
 
 
@@ -160,8 +164,8 @@ int process_block(int argc, char* argv[]) {
 	int block_queue_capacity = 0;
 
 	if (mode == 1) { //32 threads per block, 25 blocks, 32 queue capacity
-		num_of_threads = 1;
-		num_of_blocks = 10;
+		num_of_threads = 32;
+		num_of_blocks = 25;
 		block_queue_capacity = 32;
 	}
 	else if (mode == 2) { //64 threads per block, 35 blocks, 64 queue capacity
@@ -169,7 +173,7 @@ int process_block(int argc, char* argv[]) {
 		num_of_blocks = 35;
 		block_queue_capacity = 64;
 	}
-	
+
 	//Variables
 	int numNodePtrs;
 	int numNodes;
@@ -223,7 +227,7 @@ int process_block(int argc, char* argv[]) {
 	cudaEventRecord(start, 0);
 
 	block_queuing_kernel << < num_of_blocks, num_of_threads, (block_queue_capacity * sizeof(int)) >> > (block_queue_capacity, num_of_threads, numCurrLevelNodes, numNextLevelNodes_h,
-			currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
+		currLevelNodes_c, nodePtrs_c, nodeNeighbors_c, nodeVisited_c, nodeGate_c, nodeInput_c, nodeOutput_c, nextLevelNodes_c);
 
 	cudaDeviceSynchronize();
 

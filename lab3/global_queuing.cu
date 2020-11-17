@@ -127,24 +127,21 @@ int process_global(int argc, char* argv[]) {
 		char* output_next_node_filename = argv[6];
 	}
 
-	int mode = 2;
-	//number of threads
-	int num_of_threads = 0;
-	int num_of_blocks = 0;
+	int num_of_threads = 32;
+	int num_of_blocks = 35;
 
-	if (mode == 1) { 
-		num_of_threads = 32;
-		num_of_blocks = 35;
-	}
-	else if (mode == 2) {
-		num_of_threads = 64;
-		num_of_blocks = 35;
-	}
-	else if (mode == 3) { 
-		num_of_threads = 128;
-		num_of_blocks = 25;
+	if (argc == 9) {
+		num_of_blocks = atoi(argv[1]);
+		num_of_threads = atoi(argv[2]);
+		char* input_filename1 = argv[3];
+		char* input_filename2 = argv[4];
+		char* input_filename3 = argv[5];
+		char* input_filename4 = argv[6];
+		char* output_node_filename = argv[7];
+		char* output_next_node_filename = argv[8];
 	}
 
+	
 	//Code provided:
 	//Variables
 	int numNodePtrs;

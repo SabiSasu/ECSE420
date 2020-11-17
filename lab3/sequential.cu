@@ -78,16 +78,22 @@ int gate_solver(int gate, int output, int input) {
 
 int process_sequential(int argc, char* argv[]) {
 
-	//if (argc != 7)
-	//	return 0;
-	// get arguments from command line
 	char* input_filename1 = "input1.raw";//argv[1];
 	char* input_filename2 = "input2.raw";//argv[2];
 	char* input_filename3 = "input3.raw";//argv[3];
 	char* input_filename4 = "input4.raw";//argv[4];
 	char* output_node_filename = "output/output_node.raw";//argv[5];
 	char* output_next_node_filename = "output/output_next_node.raw";//argv[6];
-	
+
+	//if we have the arguments from cmd, take them instead
+	if (argc == 7) {
+		char* input_filename1 = argv[1];
+		char* input_filename2 = argv[2];
+		char* input_filename3 = argv[3];
+		char* input_filename4 = argv[4];
+		char* output_node_filename = argv[5];
+		char* output_next_node_filename = argv[6];
+	}
 																	
 	//Code provided:
 	//Variables
@@ -104,8 +110,6 @@ int process_sequential(int argc, char* argv[]) {
 	int* nodeInput_h;
 	int* nodeOutput_h;
 
-	
-
 	numNodePtrs = read_input_one_two_four(&nodePtrs_h, input_filename1);
 	numTotalNeighbors_h = read_input_one_two_four(&nodeNeighbors_h, input_filename2);
 	numNodes = read_input_three(&nodeVisited_h, &nodeGate_h, &nodeInput_h, &nodeOutput_h, input_filename3);
@@ -114,11 +118,6 @@ int process_sequential(int argc, char* argv[]) {
 
 	//output
 	int* nextLevelNodes_h = (int*)malloc(numNodePtrs * sizeof(int));
-
-	//trying to print
-	//for (int loop = 0; loop < numNodePtrs; loop++)
-	//	printf("%d ", nodePtrs_h[loop]);
-
 
 	//start clock
 	clock_t begin = clock();

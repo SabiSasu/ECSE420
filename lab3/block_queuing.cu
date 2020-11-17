@@ -132,7 +132,7 @@ __global__ void block_queuing_kernel(int block_queue_capacity, int threadNum, in
 	//}
 	//allocate space for block queue to go into global queue
 	//store block queue in global queue
-	for (int i = 0; i < block_queue_capacity; i++) {
+	for (int i = threadIdx.x; i < block_queue_capacity; i+=threadNum) {
 		//printf("inside else %d\n", shared_mem_queue[i]);
 		nextLevelNodes_h[atomicAdd(&device_count, 1)] = shared_mem_queue[i];
 		*numNextLevelNodes_h = device_count;
@@ -159,8 +159,8 @@ int process_block(int argc, char* argv[]) {
 		char* output_node_filename = argv[5];
 		char* output_next_node_filename = argv[6];
 	}
-
-	int num_of_threads = 32;
+	
+	int num_of_threads = 64;
 	int num_of_blocks = 25;
 	int block_queue_capacity = 64;
 
